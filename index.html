@@ -375,16 +375,16 @@ img { max-width: 100%; }
 .tag-spec dt, .tag-spec dd { margin: 0; padding: 12px 0; border-bottom: 1px solid var(--tag-rule); font-size: 14.5px; line-height: 1.5; }
 .tag-spec dt { color: var(--muted); letter-spacing: 3px; }
 .tag-spec dd { font-variant-numeric: tabular-nums; }
-.tag-words { margin-top: 30px; font-family: var(--f-word); font-size: 19px; line-height: 1.6; }
-.tag-words span + span::before { content: "·"; color: var(--muted); margin: 0 .5em; }
+.tag-words { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 2px .5em; font-family: var(--f-word); font-size: 19px; line-height: 1.6; }
+.tag-words span { min-width: 0; overflow-wrap: break-word; }
+.tag-words span:not(:last-child)::after { content: "·"; color: var(--muted); margin-left: .5em; }
 .endcard .swipe-hint { align-self: stretch; }
 @media (prefers-reduced-motion: reduce) { .swipe-hint svg { animation: none; } }
 
 /* practice: word-face (hear it and see it) */
 .word-face { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: max(18px, calc(var(--card-r) - 6px)); padding: 30px 16px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.wf-line { align-self: stretch; container-type: inline-size; display: block; text-align: center; }
-.wf-word { position: relative; display: inline-block; max-width: calc(100cqi - 76px); font-family: var(--f-word); font-weight: 700; font-size: 40px; font-size: clamp(26px, calc((100cqi - 76px) / var(--em, 6)), 50px); line-height: 1.08; letter-spacing: -.3px; color: var(--ink); transition: color .25s ease; overflow-wrap: break-word; text-align: center; }
-.wf-word .dots { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 12px; }
+.wf-line { align-self: stretch; container-type: inline-size; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.wf-word { display: block; max-width: 100%; font-family: var(--f-word); font-weight: 700; font-size: 40px; font-size: clamp(26px, calc((100cqi - 8px) / var(--em, 6)), 50px); line-height: 1.08; letter-spacing: -.3px; color: var(--ink); transition: color .25s ease; overflow-wrap: break-word; text-align: center; }
 .word-face.on .wf-word { color: var(--accent); }
 .wf-ipa { font-family: var(--f-word); font-size: 18px; color: var(--muted); min-height: 1.4em; opacity: 0; transition: opacity .3s ease; }
 .wf-ipa.show { opacity: 1; }
@@ -430,7 +430,7 @@ img { max-width: 100%; }
 .dots i.on { background: var(--accent); border-color: var(--accent); opacity: 1; }
 .dots i.dpop { animation: dotpop .5s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes dotpop { 0% { transform: scale(.3); } 55% { transform: scale(1.7); } 100% { transform: scale(1); } }
-.wopt .dots { margin-left: 8px; }
+.wopt .dots { position: absolute; left: 50%; bottom: 9px; transform: translateX(-50%); }
 .fb-card { scroll-margin-top: calc(var(--sat) + 70px); }
 .wrow .dots { margin-right: 2px; }
 .dots-sum { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13.5px; color: var(--muted); margin: -4px 0 14px; }
@@ -438,12 +438,12 @@ img { max-width: 100%; }
 .dots-sum b { color: var(--ink); font-family: var(--f-display); font-size: 17px; font-weight: 700; }
 /* listening: the IPA sits under the speaker; the word appears once answered */
 .l-ipa { font-family: var(--f-word); font-size: 21px; color: var(--ink); margin-top: 2px; }
-.l-reveal { display: inline-flex; align-items: center; gap: 10px; font-family: var(--f-word); font-weight: 700; font-size: 24px; min-height: 1.4em; visibility: hidden; opacity: 0; transition: opacity .3s ease; }
+.l-reveal { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; font-family: var(--f-word); font-weight: 700; font-size: 24px; min-height: 1.4em; visibility: hidden; opacity: 0; transition: opacity .3s ease; }
 .l-reveal.show { visibility: visible; opacity: 1; }
 /* sentence → meaning */
 .sm-card { background: var(--surface); border: 1px solid var(--line); border-radius: max(18px, calc(var(--card-r) - 6px)); padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
 .sm-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.sm-label { display: inline-flex; align-items: center; gap: 10px; }
+.sm-label { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; }
 .sm-word { font-family: var(--f-word); font-weight: 700; font-size: 17px; color: var(--muted); }
 .sm-sent { margin: 0; font-family: var(--f-word); font-size: 21px; line-height: 1.55; text-align: left; }
 .sm-hit { background: linear-gradient(transparent 58%, var(--tint) 58%); color: var(--accent); font-weight: 700; padding: 0 2px; border-radius: 2px; }
@@ -545,25 +545,57 @@ const TTS = {
     for (const n of pref) { best = vs.find(v => v.name.startsWith(n)); if (best) break; }
     this.voice = byName || best || vs.find(v => v.localService) || vs[0] || this.voices.find(v => /^en/i.test(v.lang)) || null;
   },
+  /* iOS drops an utterance queued right after cancel(), can stall after the app was in the background,
+     and never speaks before a first tap; each of these is handled here. */
   speak(text, opts = {}) {
     if (!this.ok || !text) { opts.onend && opts.onend(); return; }
     const s = P.settings();
+    if (!this.voices.length) { this.voices = speechSynthesis.getVoices() || []; if (this.voices.length) this.choose(); }
+    const seq = ++this.seq;
+    let ended = false;
+    const end = () => { if (ended) return; ended = true; clearTimeout(this.dog); opts.onend && opts.onend(); };
+    const go = (retry) => {
+      if (seq !== this.seq) return end();
+      const u = new SpeechSynthesisUtterance(String(text).replace(/\*\*/g, ''));
+      u.lang = (this.voice && this.voice.lang) || s.accent || 'en-GB';
+      if (this.voice) u.voice = this.voice;
+      u.rate = (opts.rate || 1) * (s.rate || 0.92);
+      u.volume = 1;
+      let started = false;
+      u.onstart = () => { started = true; };
+      u.onend = end;
+      u.onerror = e => { if (e && (e.error === 'interrupted' || e.error === 'canceled')) return end(); if (!retry) go(true); else end(); };
+      this.cur = u;   /* keep a reference: some engines drop callbacks of collected utterances */
+      try { speechSynthesis.resume(); } catch (e) {}
+      speechSynthesis.speak(u);
+      clearTimeout(this.dog);
+      /* nothing started after a while: the engine is stuck — reset it and try once more */
+      this.dog = setTimeout(() => {
+        if (started || seq !== this.seq || speechSynthesis.speaking) return;
+        try { speechSynthesis.cancel(); } catch (e) {}
+        if (!retry) setTimeout(() => go(true), 120); else end();
+      }, 1600);
+    };
+    const busy = speechSynthesis.speaking || speechSynthesis.pending;
     try { speechSynthesis.cancel(); } catch (e) {}
-    const u = new SpeechSynthesisUtterance(String(text).replace(/\*\*/g, ''));
-    u.lang = (this.voice && this.voice.lang) || s.accent || 'en-GB';
-    if (this.voice) u.voice = this.voice;
-    u.rate = (opts.rate || 1) * (s.rate || 0.92);
-    u.onend = () => { opts.onend && opts.onend(); };
-    u.onerror = () => { opts.onend && opts.onend(); };
-    speechSynthesis.speak(u);
+    if (busy) setTimeout(() => go(false), 90); else go(false);
   },
-  stop() { try { speechSynthesis.cancel(); } catch (e) {} },
+  seq: 0, dog: 0, cur: null,
+  stop() { this.seq++; clearTimeout(this.dog); try { speechSynthesis.cancel(); } catch (e) {} },
   unlocked: false,
   unlock() {
-    if (this.unlocked || !this.ok) return;
-    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); this.unlocked = true; } catch (e) {}
+    if (this.unlocked) return;
+    this.unlocked = true;
+    /* ask iOS to treat this as a playback app, so sound is not tied to the ring/silent switch */
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    try { const a = new Audio(SILENT_WAV); a.playsInline = true; a.play().catch(() => {}); } catch (e) {}
+    if (!this.ok) return;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
   },
 };
+/* 0.1 s of silence: playing it inside the first tap opens the audio session for speech */
+const SILENT_WAV = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && TTS.ok) { try { speechSynthesis.cancel(); } catch (e) {} } });
 document.addEventListener('touchend', () => TTS.unlock(), { once: true, capture: true });
 document.addEventListener('click', () => TTS.unlock(), { once: true, capture: true });
 function sayWord(w, slow) { TTS.speak(speakable(w.w), { rate: slow ? 0.6 : 1 }); }
@@ -813,9 +845,26 @@ function modsOf(u) { const m = P.data.mods[u.id]; return Array.isArray(m) ? m : 
 
 /* ============================================================ meaning helpers */
 const POS_RE = /\b(n|v|vt|vi|adj|adv|prep|conj|pron|num|abbr|int|interj|art|aux)\.\s*/g;
+/* The scan left phonetic fragments ("/n.", "'delte/n.", ": n.") and OCR slips ("adi.", "n．") in some meanings. */
+const CLEAN_M = new Map();
+function cleanMeaning(m) {
+  const raw = String(m || '');
+  if (CLEAN_M.has(raw)) return CLEAN_M.get(raw);
+  let s = raw.replace(/\badi\./g, 'adj.').replace(/\b(n|v|vt|vi|adj|adv|prep|conj|pron|num)．/g, '$1.');
+  const k = s.search(/(?:^|[^A-Za-z])(?:n|v|vt|vi|adj|adv|prep|conj|pron|num|art|int|interj|abbr|aux)\.\s*/);
+  if (k > 0) {
+    const pre = s.slice(0, k + 1);
+    /* keep alternate spellings such as （=jeopardize）; drop anything else without Chinese in it */
+    if (!/[=＝]/.test(pre) && !/[\u4e00-\u9fff]/.test(pre)) s = s.slice(k + (/[A-Za-z]/.test(s[k]) ? 0 : 1));
+  }
+  s = s.replace(/^[\s.:：!！<>\/'"’‘|1I]+(?=[\u4e00-\u9fff（(]|(?:n|v|adj|adv)\.)/, '').trim();
+  s = s.replace(/^[^（(\u4e00-\u9fff]+(?=[（(]\s*[=＝])/, '').replace(/^m\.\s*(?=[\u4e00-\u9fff])/, 'n.');
+  CLEAN_M.set(raw, s);
+  return s;
+}
 function meaningNodes(m) {
   const frag = [];
-  const s = String(m || '');
+  const s = cleanMeaning(m);
   let last = 0, mt;
   POS_RE.lastIndex = 0;
   while ((mt = POS_RE.exec(s))) {
@@ -827,7 +876,7 @@ function meaningNodes(m) {
   return frag;
 }
 function shortMeaning(m, max = 26) {
-  let s = String(m || '').replace(/\s+/g, ' ').trim();
+  let s = cleanMeaning(m).replace(/\s+/g, ' ').trim();
   if (s.length > max) s = s.slice(0, max).replace(/[；;，,\s]+[^；;，,]*$/, '') + '…';
   return s;
 }
@@ -1039,7 +1088,7 @@ function shell(title, frac, countText, onClose) {
 /* ============================================================ exercises */
 function optionMeanings(word, pool, n = 4, near) {
   const own = shortMeaning(word.m);
-  const posOf = w => (String(w.m).match(/^(\w+)\./) || [])[1];
+  const posOf = w => (cleanMeaning(w.m).match(/^(\w+)\./) || [])[1];
   const p = posOf(word);
   const nearIds = new Set((near || []).map(x => x.id));
   const seen = new Set([own]);
@@ -1081,7 +1130,7 @@ const EX = {
       const sub = h('span', { class: 'wf-sub' });
       sub.innerHTML = ICON.play; sub.append('点单词听发音');
       const face = h('button', { class: 'word-face', type: 'button', 'aria-label': '再听 ' + word.w },
-        h('span', { class: 'wf-line' }, h('span', { class: 'wf-word', lang: 'en', style: { '--em': fitEm(word.w) } }, word.w, it.dots || null)), ipa, sub);
+        h('span', { class: 'wf-line' }, h('span', { class: 'wf-word', lang: 'en', style: { '--em': fitEm(word.w) } }, word.w), it.dots || null), ipa, sub);
       play = (slow) => { face.classList.add('on'); TTS.speak(speakable(word.w), { rate: slow ? 0.6 : 1, onend: () => face.classList.remove('on') }); };
       face.addEventListener('click', () => play());
       box.append(h('div', { class: 'q-prompt' }, h('span', { class: 'ask' }, '看单词，选出它的意思'), face));
