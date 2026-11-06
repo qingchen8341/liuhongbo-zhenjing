@@ -1,6 +1,6 @@
 /* 雅思真经听读 offline cache. Bump happens automatically when any file changes. */
-const VERSION = 'zhenjing-caf84e2d05';
-const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png", "./GentiumBookPlus-Regular.woff2", "./GentiumBookPlus-Bold.woff2", "./GentiumBookPlus-Italic.woff2", "./BarlowCondensed-SemiBold.woff2", "./BarlowCondensed-Bold.woff2", "./BarlowCondensed-BoldItalic.woff2", "./BarlowCondensed-ExtraBoldItalic.woff2"];
+const VERSION = 'zhenjing-6599066afc';
+const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-v2-180.png", "./icon-v2-192.png", "./icon-v2-512.png", "./GentiumBookPlus-Regular.woff2", "./GentiumBookPlus-Bold.woff2", "./GentiumBookPlus-Italic.woff2", "./BarlowCondensed-SemiBold.woff2", "./BarlowCondensed-Bold.woff2", "./BarlowCondensed-BoldItalic.woff2", "./BarlowCondensed-ExtraBoldItalic.woff2"];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });

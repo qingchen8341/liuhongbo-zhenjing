@@ -7,8 +7,8 @@
 <meta name="theme-color" content="#121315" media="(prefers-color-scheme: dark)">
 <title>雅思真经听读</title>
 <link rel="manifest" href="./manifest.webmanifest">
-<link rel="apple-touch-icon" href="./icon-180.png">
-<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-v2-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-v2-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -138,7 +138,7 @@ img { max-width: 100%; }
 .nav-in { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; height: 100%; gap: 2px; }
 .nav a { text-decoration: none; color: var(--muted); font-size: 11px; font-weight: 500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: calc((var(--tab-h) - 10px) / 2); transition: background .2s ease, color .2s ease; }
 .nav a.on { background: var(--glass-sel); }
-.nav a .g { font-family: var(--f-display); font-weight: 700; font-size: 19px; line-height: 1; }
+.nav a .g { font-family: var(--f-display); font-weight: 700; font-size: 14px; line-height: 1; letter-spacing: .8px; text-transform: uppercase; }
 .nav a.on { color: var(--accent); }
 .nav a.on .g { color: var(--accent); }
 
@@ -171,7 +171,7 @@ img { max-width: 100%; }
 /* word card */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .hw-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.hw { font-family: var(--f-word); font-weight: 700; font-size: 38px; line-height: 1.1; letter-spacing: -.3px; word-break: break-word; }
+.hw { font-family: var(--f-word); font-weight: 700; font-size: 38px; line-height: 1.1; letter-spacing: -.3px; word-break: normal; overflow-wrap: break-word; }
 .ipa { font-family: var(--f-word); font-size: 19px; color: var(--muted); }
 .mean { font-size: 17px; font-weight: 600; }
 .mean .pos { font-family: var(--f-word); font-style: italic; font-weight: 400; color: var(--accent); margin-right: 2px; }
@@ -214,7 +214,7 @@ img { max-width: 100%; }
 .chain.inline .fin { font-size: 14.5px; }
 /* roots marked inside the headword */
 .hw .rs { display: inline-block; background: linear-gradient(var(--r-tone), var(--r-tone)) no-repeat 0 100% / calc(100% - 3px) 4px; padding-bottom: 9px; }
-.hw:has(.rs) + .ipa { margin-top: 2px; }
+.hw:has(.rs) + .ipa-row { margin-top: 2px; }
 .hw.tap { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cols { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .cols span { font-size: 14.5px; }
@@ -256,7 +256,7 @@ img { max-width: 100%; }
 .opt.right { border-color: var(--good); background: var(--good-tint); }
 .opt.wrong { border-color: var(--bad); background: var(--bad-tint); }
 .opt[disabled] { cursor: default; }
-.opt .reveal { font-family: var(--f-word); margin-left: auto; color: var(--muted); }
+.opt .reveal { font-family: var(--f-word); margin-left: auto; color: var(--muted); white-space: nowrap; }
 .fb { border-radius: 14px; padding: 12px 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .fb.ok { background: var(--good-tint); color: var(--good); }
 .fb.no { background: var(--bad-tint); color: var(--bad); }
@@ -363,7 +363,6 @@ img { max-width: 100%; }
 .dcard > * { flex-shrink: 0; }
 .dcard.behind { z-index: 1; pointer-events: none; }
 .dcard.incoming { z-index: 3; }
-.dcard .hw { font-size: 42px; }
 .swipe-hint { margin-top: auto; padding: 22px 0 calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 0; color: var(--muted); font-size: 13px; letter-spacing: 1px; }
 .swipe-hint svg { width: 24px; height: 24px; color: var(--accent); animation: nudge 1.9s ease-in-out infinite; }
 @keyframes nudge { 0%, 100% { transform: translateY(3px); opacity: .55; } 45% { transform: translateY(-4px); opacity: 1; } }
@@ -383,8 +382,9 @@ img { max-width: 100%; }
 
 /* practice: word-face (hear it and see it) */
 .word-face { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: max(18px, calc(var(--card-r) - 6px)); padding: 30px 16px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.wf-word { font-family: var(--f-word); font-weight: 700; font-size: clamp(34px, 11.5vw, 50px); line-height: 1.08; letter-spacing: -.3px; color: var(--ink); transition: color .25s ease; word-break: break-word; text-align: center; }
-.wf-word.long { font-size: clamp(28px, 8.5vw, 40px); }
+.wf-line { align-self: stretch; container-type: inline-size; display: block; text-align: center; }
+.wf-word { position: relative; display: inline-block; max-width: calc(100cqi - 76px); font-family: var(--f-word); font-weight: 700; font-size: 40px; font-size: clamp(26px, calc((100cqi - 76px) / var(--em, 6)), 50px); line-height: 1.08; letter-spacing: -.3px; color: var(--ink); transition: color .25s ease; overflow-wrap: break-word; text-align: center; }
+.wf-word .dots { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 12px; }
 .word-face.on .wf-word { color: var(--accent); }
 .wf-ipa { font-family: var(--f-word); font-size: 18px; color: var(--muted); min-height: 1.4em; opacity: 0; transition: opacity .3s ease; }
 .wf-ipa.show { opacity: 1; }
@@ -416,6 +416,39 @@ img { max-width: 100%; }
 .wopt[disabled] { cursor: default; }
 @media (hover: none) { .wopt .key { display: none; } }
 @media (prefers-reduced-motion: reduce) { .cz-play.on::after, .word-face.on .wf-sub svg { animation: none; } .cz-zh { animation: none; } }
+/* word card head: centred, sized so the longest word fits on one line */
+.head { container-type: inline-size; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding-top: 6px; }
+.head .hw { --hw-max: 42px; max-width: 100%; font-size: 34px; font-size: clamp(26px, calc(100cqi / var(--em, 6)), var(--hw-max)); }
+.dcard .head .hw { --hw-max: 46px; }
+.ipa-row { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.ipa-row .sbtn.sm { width: 32px; height: 32px; transition: background .2s ease, color .2s ease; }
+.ipa-row .sbtn.slow { background: var(--accent); color: var(--accent-ink); }
+.head .mean { margin-top: 4px; }
+/* mastery dots */
+.dots { display: inline-flex; gap: 5px; vertical-align: middle; line-height: 0; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid var(--muted); opacity: .5; }
+.dots i.on { background: var(--accent); border-color: var(--accent); opacity: 1; }
+.dots i.dpop { animation: dotpop .5s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes dotpop { 0% { transform: scale(.3); } 55% { transform: scale(1.7); } 100% { transform: scale(1); } }
+.wopt .dots { margin-left: 8px; }
+.fb-card { scroll-margin-top: calc(var(--sat) + 70px); }
+.wrow .dots { margin-right: 2px; }
+.dots-sum { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13.5px; color: var(--muted); margin: -4px 0 14px; }
+.dots-sum span { display: inline-flex; align-items: center; gap: 7px; }
+.dots-sum b { color: var(--ink); font-family: var(--f-display); font-size: 17px; font-weight: 700; }
+/* listening: the IPA sits under the speaker; the word appears once answered */
+.l-ipa { font-family: var(--f-word); font-size: 21px; color: var(--ink); margin-top: 2px; }
+.l-reveal { display: inline-flex; align-items: center; gap: 10px; font-family: var(--f-word); font-weight: 700; font-size: 24px; min-height: 1.4em; visibility: hidden; opacity: 0; transition: opacity .3s ease; }
+.l-reveal.show { visibility: visible; opacity: 1; }
+/* sentence → meaning */
+.sm-card { background: var(--surface); border: 1px solid var(--line); border-radius: max(18px, calc(var(--card-r) - 6px)); padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.sm-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sm-label { display: inline-flex; align-items: center; gap: 10px; }
+.sm-word { font-family: var(--f-word); font-weight: 700; font-size: 17px; color: var(--muted); }
+.sm-sent { margin: 0; font-family: var(--f-word); font-size: 21px; line-height: 1.55; text-align: left; }
+.sm-hit { background: linear-gradient(transparent 58%, var(--tint) 58%); color: var(--accent); font-weight: 700; padding: 0 2px; border-radius: 2px; }
+.sm-zh { font-size: 15px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px; animation: qin .24s ease both; }
+@media (min-width: 900px) { .head .hw { --hw-max: 52px; } }
 @media (display-mode: standalone) {
   html { min-height: calc(100% + env(safe-area-inset-top)); }
   /* --vfix is the strip WebKit leaves under fixed boxes on home-screen apps (0 when it sizes them correctly) */
@@ -434,10 +467,10 @@ img { max-width: 100%; }
 <div id="app" aria-live="polite"></div>
 <nav class="nav" id="nav" hidden>
   <div class="nav-in">
-    <a href="#today" id="nav-today"><span class="g">今</span>今日</a>
-    <a href="#units" id="nav-units"><span class="g">元</span>单元</a>
-    <a href="#weak" id="nav-weak"><span class="g">难</span>难词</a>
-    <a href="#settings" id="nav-settings"><span class="g">设</span>设置</a>
+    <a href="#today" id="nav-today"><span class="g">Today</span>今日</a>
+    <a href="#units" id="nav-units"><span class="g">Units</span>单元</a>
+    <a href="#weak" id="nav-weak"><span class="g">Tricky</span>难词</a>
+    <a href="#settings" id="nav-settings"><span class="g">Settings</span>设置</a>
   </div>
 </nav>
 <script>window.OFFLINE_EDITION = true;</script>
@@ -452,7 +485,7 @@ function h(tag, attrs, ...kids) {
     if (k === 'class') el.className = v;
     else if (k === 'html') el.innerHTML = v;
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'style' && typeof v === 'object') for (const [sk, sv] of Object.entries(v)) { if (sk.startsWith('--')) el.style.setProperty(sk, sv); else el.style[sk] = sv; }
     else el.setAttribute(k, v === true ? '' : v);
   }
   for (const k of kids.flat(Infinity)) {
@@ -535,6 +568,22 @@ document.addEventListener('touchend', () => TTS.unlock(), { once: true, capture:
 document.addEventListener('click', () => TTS.unlock(), { once: true, capture: true });
 function sayWord(w, slow) { TTS.speak(speakable(w.w), { rate: slow ? 0.6 : 1 }); }
 function speakable(s) { return String(s).replace(/\(.*?\)|（.*?）/g, ' ').replace(/\bsb\.?/g, 'somebody').replace(/\bsth\.?/g, 'something').replace(/[\/=]/g, ' ').trim(); }
+/* Advance widths of Gentium Book Plus Bold, in em: lets CSS size a headword to fit its line. */
+const GLYPH_EM = { a: .51, b: .55, c: .46, d: .57, e: .49, f: .35, g: .53, h: .59, i: .31, j: .3, k: .57, l: .31, m: .86, n: .59, o: .53, p: .57, q: .56, r: .46, s: .43, t: .38, u: .57, v: .51, w: .72, x: .53, y: .51, z: .48,
+  A: .64, B: .62, C: .57, D: .65, E: .54, F: .52, G: .61, H: .69, I: .34, J: .34, K: .63, L: .52, M: .86, N: .67, O: .63, P: .58, Q: .63, R: .62, S: .52, T: .59, U: .67, V: .67, W: .85, X: .63, Y: .62, Z: .55,
+  '-': .36, "'": .28, '.': .28, ',': .28, '(': .34, ')': .34, '/': .48 };
+function emWidth(s) { let t = 0; for (const ch of String(s)) t += GLYPH_EM[ch] ?? (/[A-Z]/.test(ch) ? .64 : .56); return t; }
+function fitEm(s) { return (Math.max(3, ...String(s).trim().split(/\s+/).map(emWidth)) * 1.06).toFixed(2); }
+/* Mastery dots: three per word, one lit for each question answered right first time. */
+function dotsEl(n) {
+  const el = h('span', { class: 'dots', role: 'img', 'aria-label': '熟练度 ' + n + '/3' }, [0, 1, 2].map(i => h('i', { class: i < n ? 'on' : null })));
+  return el;
+}
+function lightDot(el, n) {
+  const d = el && el.children[n - 1]; if (!d) return;
+  d.classList.add('on'); if (!REDUCED) d.classList.add('dpop');
+  el.setAttribute('aria-label', '熟练度 ' + n + '/3');
+}
 function soundBtn(onclick, label = '播放', small = false, kind = 'play') {
   const b = h('button', { class: 'sbtn' + (small ? ' sm' : ''), 'aria-label': label, title: label, type: 'button' });
   b.innerHTML = ICON[kind];
@@ -625,7 +674,7 @@ const Store = {
 const INTERVALS = [1, 2, 4, 7, 15];
 const P = {
   data: null, unsub: null, saving: false, dirty: false, timer: null, listeners: [],
-  blank() { return { v: 1, learned: {}, mods: {}, rev: {}, read: {}, weak: {}, days: {}, settings: { accent: 'en-GB', rate: 0.92, autoplay: true } }; },
+  blank() { return { v: 1, learned: {}, mods: {}, rev: {}, read: {}, weak: {}, dots: {}, days: {}, settings: { accent: 'en-GB', rate: 0.92, autoplay: true } }; },
   settings() { return (this.data && this.data.settings) || { accent: 'en-GB', rate: 0.92, autoplay: true }; },
   async load() {
     let d = null;
@@ -639,8 +688,11 @@ const P = {
     } else {
       d = await IDB.get('progress');
     }
+    const migrate = !(d && d.dots);
     this.data = Object.assign(this.blank(), d || {});
     this.data.settings = Object.assign(this.blank().settings, this.data.settings || {});
+    /* older progress only counted mistakes: each one costs a dot */
+    if (migrate) for (const [id, n] of Object.entries(this.data.weak || {})) this.data.dots[id] = Math.max(0, 3 - n);
   },
   watch() {
     if (this.unsub || Store.mode !== 'cloud') return;
@@ -650,6 +702,7 @@ const P = {
         const remote = JSON.parse(JSON.stringify(snap.data()));
         if (JSON.stringify(remote) === JSON.stringify(this.data)) return;
         this.data = Object.assign(this.blank(), remote);
+        this.data.dots = this.data.dots || {};
         this.data.settings = Object.assign(this.blank().settings, remote.settings || {});
         IDB.set('progress', this.data);
         this.listeners.forEach(f => f());
@@ -678,6 +731,9 @@ const P = {
     else { day[field] = day[field] || []; if (!day[field].includes(val)) day[field].push(val); }
   },
   wrong(wid) { this.data.weak[wid] = (this.data.weak[wid] || 0) + 1; },
+  /* words never scored are treated as known; 0–2 lit dots puts a word in 难词 */
+  dot(id) { const v = this.data.dots[id]; return v == null ? 3 : v; },
+  setDot(id, n) { this.data.dots[id] = Math.max(0, Math.min(3, n)); return this.data.dots[id]; },
 };
 
 /* ============================================================ content */
@@ -898,16 +954,20 @@ function wordCard(w, opts = {}) {
   const card = h('article', { class: 'card' });
   const ety = w.note ? etyBlock(w.note) : null;
   const segs = ety && ety.hero ? segmentHead(w.w, ety.hero.terms) : null;
-  const hw = h('div', { class: 'hw', lang: 'en' },
+  const hw = h('div', { class: 'hw', lang: 'en', style: { '--em': fitEm(w.w) } },
     segs ? segs.map(g => g.tone == null ? g.s : h('span', { class: 'rs t' + g.tone }, g.s)) : w.w);
   if (opts.deck) { hw.classList.add('tap'); hw.addEventListener('click', () => sayWord(w)); hw.title = '点一下再听'; }
-  const top = h('div', { class: 'hw-row' },
-    h('div', null, hw, w.ipa ? h('div', { class: 'ipa' }, '/' + w.ipa + '/') : null),
-    h('div', { class: 'sbtns' },
-      soundBtn(() => sayWord(w), '朗读单词'),
-      soundBtn(() => sayWord(w, true), '慢速朗读', false, 'slow')));
-  card.append(top);
-  if (w.m) card.append(h('div', { class: 'mean' }, meaningNodes(w.m)));
+  /* one speaker beside the IPA: a second tap right after the first plays it slowly */
+  let lastTap = 0, lastSlow = false;
+  const spk = soundBtn(() => {
+    const now = Date.now(), slow = now - lastTap < 6000 && !lastSlow;
+    lastTap = now; lastSlow = slow;
+    spk.innerHTML = ICON[slow ? 'slow' : 'play']; spk.classList.toggle('slow', slow);
+    TTS.speak(speakable(w.w), { rate: slow ? 0.6 : 1, onend: () => { spk.innerHTML = ICON.play; spk.classList.remove('slow'); } });
+  }, '朗读（再点一次放慢）', true);
+  card.append(h('div', { class: 'head' }, hw,
+    h('div', { class: 'ipa-row' }, w.ipa ? h('span', { class: 'ipa' }, '/' + w.ipa + '/') : null, spk),
+    w.m ? h('div', { class: 'mean' }, meaningNodes(w.m)) : null));
   if (w.img) {
     const box = h('div', { class: 'illus' }, h('span', { class: 'note' }, '图例加载中…'));
     card.append(box);
@@ -977,15 +1037,33 @@ function shell(title, frac, countText, onClose) {
 }
 
 /* ============================================================ exercises */
-function optionMeanings(word, pool, n = 4) {
+function optionMeanings(word, pool, n = 4, near) {
   const own = shortMeaning(word.m);
   const posOf = w => (String(w.m).match(/^(\w+)\./) || [])[1];
   const p = posOf(word);
-  let cands = pool.filter(x => x.id !== word.id && x.m && shortMeaning(x.m) !== own);
-  const same = shuffle(cands.filter(x => posOf(x) === p));
-  const rest = shuffle(cands.filter(x => posOf(x) !== p));
-  const picked = [...same, ...rest].slice(0, n - 1);
+  const nearIds = new Set((near || []).map(x => x.id));
+  const seen = new Set([own]);
+  const cands = [...(near || []), ...pool].filter(x => x.id !== word.id && x.m && !seen.has(shortMeaning(x.m)) && seen.add(shortMeaning(x.m)));
+  /* related words (same themed group) first, then same part of speech */
+  const tier = x => (nearIds.has(x.id) ? 0 : 2) + (posOf(x) === p ? 0 : 1);
+  const picked = shuffle(cands).sort((a, b) => tier(a) - tier(b)).slice(0, n - 1);
   return shuffle([word, ...picked]);
+}
+function meaningChoices(word, opts, onPick) {
+  const list = h('div', { class: 'opts' });
+  let answered = false;
+  opts.forEach((o, i) => {
+    const b = h('button', { class: 'opt', type: 'button' }, h('span', { class: 'key' }, i + 1), h('span', null, shortMeaning(o.m, 30)));
+    b.addEventListener('click', () => {
+      if (answered) return; answered = true;
+      const ok = o.id === word.id;
+      [...list.children].forEach((x, j) => { x.disabled = true; if (opts[j].id === word.id) x.classList.add('right'); x.append(h('span', { class: 'reveal', lang: 'en' }, opts[j].w)); });
+      if (!ok) b.classList.add('wrong');
+      onPick(ok);
+    });
+    list.append(b);
+  });
+  return list;
 }
 function optionWords(word, pool, n = 4) {
   const cands = shuffle(pool.filter(x => x.id !== word.id && x.w.toLowerCase() !== word.w.toLowerCase()));
@@ -1003,7 +1081,7 @@ const EX = {
       const sub = h('span', { class: 'wf-sub' });
       sub.innerHTML = ICON.play; sub.append('点单词听发音');
       const face = h('button', { class: 'word-face', type: 'button', 'aria-label': '再听 ' + word.w },
-        h('span', { class: 'wf-word' + (word.w.length > 11 ? ' long' : ''), lang: 'en' }, word.w), ipa, sub);
+        h('span', { class: 'wf-line' }, h('span', { class: 'wf-word', lang: 'en', style: { '--em': fitEm(word.w) } }, word.w, it.dots || null)), ipa, sub);
       play = (slow) => { face.classList.add('on'); TTS.speak(speakable(word.w), { rate: slow ? 0.6 : 1, onend: () => face.classList.remove('on') }); };
       face.addEventListener('click', () => play());
       box.append(h('div', { class: 'q-prompt' }, h('span', { class: 'ask' }, '看单词，选出它的意思'), face));
@@ -1012,25 +1090,13 @@ const EX = {
       const lb = h('button', { class: 'listen', 'aria-label': '再听一遍', onclick: () => play() });
       lb.innerHTML = ICON.play;
       play = (slow) => { lb.classList.add('on'); TTS.speak(speakable(word.w), { rate: slow ? 0.6 : 1, onend: () => lb.classList.remove('on') }); };
+      const after = h('div', { class: 'l-reveal', lang: 'en' }, h('span', null, word.w), it.dots || null);
       box.append(h('div', { class: 'q-prompt' }, h('span', { class: 'ask' }, '听音，选出它的意思'), lb,
-        h('button', { class: 'link slow', onclick: () => play(true) }, '慢速再听')));
+        word.ipa ? h('div', { class: 'l-ipa' }, '/' + word.ipa + '/') : null,
+        h('button', { class: 'link slow', onclick: () => play(true) }, '慢速再听'), after));
+      revealExtra = () => after.classList.add('show');
     }
-    const list = h('div', { class: 'opts' });
-    let answered = false;
-    const choose = (o, btn) => {
-      if (answered) return; answered = true;
-      const ok = o.id === word.id;
-      [...list.children].forEach((b, i) => { b.disabled = true; if (opts[i].id === word.id) b.classList.add('right'); });
-      if (!ok) btn.classList.add('wrong');
-      [...list.children].forEach((b, i) => b.append(h('span', { class: 'reveal', lang: 'en' }, opts[i].w)));
-      revealExtra();
-      done(ok);
-    };
-    opts.forEach((o, i) => {
-      const b = h('button', { class: 'opt' }, h('span', { class: 'key' }, i + 1), h('span', null, shortMeaning(o.m, 30)));
-      b.addEventListener('click', () => choose(o, b));
-      list.append(b);
-    });
+    const list = meaningChoices(word, opts, ok => { revealExtra(); done(ok); });
     box.append(list);
     KEYS.handler = e => {
       if (e.key === ' ') { e.preventDefault(); play(); }
@@ -1038,36 +1104,17 @@ const EX = {
     };
     return play;
   },
-  clozeListen(box, word, pool, done) {
+  /* the example sentence, word highlighted: what does it mean here? */
+  sentenceMeaning(box, word, pool, done, it = {}) {
     const cz = clozeOf(word);
-    const opts = optionWords(word, pool);
-    const pb = h('button', { class: 'cz-play', type: 'button', 'aria-label': '播放例句' });
-    pb.innerHTML = ICON.play;
-    const play = (slow) => { pb.classList.add('on'); TTS.speak(cz.en, { rate: slow ? 0.75 : 1, onend: () => pb.classList.remove('on') }); };
-    pb.addEventListener('click', () => play());
-    const slowBtn = h('button', { class: 'cz-slow', type: 'button' }, '慢速 0.75×');
-    slowBtn.addEventListener('click', () => play(true));
-    const gap = h('span', { class: 'cz-gap', style: { '--w': (Math.max(5, cz.hit.length) + 1) + 'ch' }, 'aria-label': '空格' }, cz.hit);
-    const sent = h('p', { class: 'cz-sent', lang: 'en' }, cz.before.trimEnd() + ' ', gap, ' ' + cz.after.trimStart());
-    const card = h('div', { class: 'cz-card' },
-      h('div', { class: 'cz-top' }, pb, h('div', { class: 'cz-meta' }, h('b', null, '读例句'), h('span', null, '选出空格里的词 · 可点播放听整句')), slowBtn),
-      sent);
-    box.append(card);
-    const list = h('div', { class: 'wopts' });
-    let answered = false;
-    opts.forEach((o, i) => {
-      const b = h('button', { class: 'wopt', lang: 'en', type: 'button' }, h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1), o.w);
-      b.addEventListener('click', () => {
-        if (answered) return; answered = true;
-        const ok = o.id === word.id;
-        [...list.children].forEach((x, j) => { x.disabled = true; if (opts[j].id === word.id) x.classList.add('right'); });
-        if (!ok) b.classList.add('wrong');
-        gap.classList.add('filled');
-        if (cz.zh) card.append(h('div', { class: 'cz-zh' }, cz.zh));
-        done(ok);
-      });
-      list.append(b);
-    });
+    const opts = optionMeanings(word, pool, 4, it.near);
+    const play = () => { pb.classList.add('on'); TTS.speak(cz.en, { onend: () => pb.classList.remove('on') }); };
+    const pb = soundBtn(() => play(), '朗读例句', true);
+    const card = h('div', { class: 'sm-card' },
+      h('div', { class: 'sm-top' }, h('span', { class: 'sm-label' }, h('span', { class: 'sm-word', lang: 'en' }, word.w), it.dots || null), pb),
+      h('p', { class: 'sm-sent', lang: 'en' }, cz.before, h('mark', { class: 'sm-hit' }, cz.hit), cz.after));
+    box.append(h('div', { class: 'q-prompt' }, h('span', { class: 'ask' }, '读例句，选出高亮词在句中的意思')), card);
+    const list = meaningChoices(word, opts, ok => { if (cz.zh) card.append(h('div', { class: 'sm-zh' }, cz.zh)); done(ok); });
     box.append(list);
     KEYS.handler = e => {
       if (e.key === ' ') { e.preventDefault(); play(); }
@@ -1075,7 +1122,7 @@ const EX = {
     };
     return play;
   },
-  meaningToWord(box, word, pool, done) {
+  meaningToWord(box, word, pool, done, it = {}) {
     const opts = optionWords(word, pool);
     box.append(h('div', { class: 'q-prompt' }, h('span', { class: 'ask' }, '看释义，选出对应的单词'), h('div', { class: 'big' }, meaningNodes(shortMeaning(word.m, 40)))));
     const list = h('div', { class: 'wopts' });
@@ -1085,7 +1132,7 @@ const EX = {
       b.addEventListener('click', () => {
         if (answered) return; answered = true;
         const ok = o.id === word.id;
-        [...list.children].forEach((x, j) => { x.disabled = true; if (opts[j].id === word.id) x.classList.add('right'); });
+        [...list.children].forEach((x, j) => { x.disabled = true; if (opts[j].id === word.id) { x.classList.add('right'); if (it.dots) x.append(it.dots); } });
         if (!ok) b.classList.add('wrong');
         done(ok);
       });
@@ -1134,7 +1181,7 @@ const EX = {
 };
 
 /* Generic drill runner: queue of {type, word}; wrong answers come back at the end. */
-function runDrill({ title, items, pool, onFinish, retry = true, unitTag }) {
+function runDrill({ title, items, pool, onFinish, retry = true, mastery }) {
   const queue = items.slice();
   const total = queue.length;
   let doneCount = 0, right = 0, wrongSet = new Set();
@@ -1147,20 +1194,28 @@ function runDrill({ title, items, pool, onFinish, retry = true, unitTag }) {
     inner.append(box);
     const foot = h('div', { class: 'foot' });
     inner.append(foot);
+    /* retries don't earn dots, so they don't show them either */
+    it.dots = mastery && !it.again ? dotsEl(mastery.get(it.word.id)) : null;
     const play = EX[it.type](box, it.word, pool, ok => {
       if (ok) {
-        /* right answer: let the green register for a moment, then move straight on */
-        right++; doneCount++;
+        /* right answer: light a dot, let the green register for a moment, then move straight on */
+        if (!it.again) right++;
+        doneCount++;
+        if (it.dots) lightDot(it.dots, mastery.hit(it.word.id));
         KEYS.handler = null;
         const bar = inner.querySelector('.prog i');
         if (bar) bar.style.width = (doneCount / total * 100).toFixed(1) + '%';
-        setTimeout(step, REDUCED ? 220 : 620);
+        setTimeout(step, REDUCED ? 220 : it.dots ? 820 : 620);
         return;
       }
       wrongSet.add(it.word.id); P.wrong(it.word.id);
-      if (retry) queue.push({ type: it.type === 'meaningToSound' ? 'listenMeaning' : it.type, word: it.word, again: true, mode: 'see' });
+      if (retry) queue.push({ type: it.type === 'meaningToSound' ? 'listenMeaning' : it.type, word: it.word, again: true, mode: 'see', near: it.near });
       else doneCount++;
-      box.append(wordCard(it.word));
+      const wc = wordCard(it.word);
+      wc.classList.add('fb-card');
+      box.append(wc);
+      /* bring the explanation card up into view above the sticky footer */
+      setTimeout(() => wc.scrollIntoView({ block: 'start', behavior: REDUCED ? 'auto' : 'smooth' }), 380);
       const next = h('button', { class: 'btn block', onclick: step }, '记住了，继续');
       foot.append(h('div', { class: 'fb no' }, '答错了，这个词会再出现一次', soundBtn(() => sayWord(it.word), '朗读', true)), next);
       KEYS.handler = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); step(); } };
@@ -1173,6 +1228,21 @@ function runDrill({ title, items, pool, onFinish, retry = true, unitTag }) {
 }
 
 /* ============================================================ learn a module */
+/* concatenate question rounds so the same word never comes up twice in a row */
+function joinRounds(...rounds) {
+  const out = [];
+  for (const r of rounds) {
+    const q = r.slice();
+    if (out.length && q.length > 1 && q[0].word === out[out.length - 1].word) [q[0], q[1]] = [q[1], q[0]];
+    out.push(...q);
+  }
+  return out;
+}
+function formsFor(w, near) {
+  return [{ type: 'listenMeaning', word: w, mode: 'see' },
+    clozeOf(w) ? { type: 'sentenceMeaning', word: w, near } : { type: 'listenMeaning', word: w, mode: 'listen' },
+    { type: 'meaningToWord', word: w }];
+}
 async function startModule(u, mi) {
   TTS.unlock();
   const words = await loadUnit(u.id);
@@ -1180,16 +1250,23 @@ async function startModule(u, mi) {
   const mw = ids.map(id => words.find(w => w.id === id)).filter(Boolean);
   openOverlay();
   runDeck(mw, () => practice(), { label: 'U' + unitNo(u) + ' · No.' + String(mi + 1).padStart(2, '0') });
+  const sess = new Map(mw.map(w => [w.id, 0]));
   const practice = () => {
-    /* recognise by sight first; at most one sound-only question per module */
-    const a = shuffle(mw).map((w, k) => ({ type: 'listenMeaning', word: w, mode: (k === mw.length - 1 && mw.length >= 4) ? 'listen' : 'see' }));
-    const b = shuffle(mw).map((w, k) => ({ type: clozeOf(w) && k % 2 === 0 ? 'clozeListen' : 'meaningToWord', word: w }));
+    /* every word three times: by sight, in its sentence, from its meaning. One dot per first-try right answer. */
+    const withEx = mw.filter(w => clozeOf(w));
+    const ear = mw.length >= 4 && withEx.length ? withEx[Math.floor(Math.random() * withEx.length)] : null;
+    const items = joinRounds(
+      shuffle(mw).map(w => ({ type: 'listenMeaning', word: w, mode: w === ear ? 'listen' : 'see' })),
+      shuffle(mw).map(w => clozeOf(w) ? { type: 'sentenceMeaning', word: w, near: mw } : { type: 'listenMeaning', word: w, mode: 'listen' }),
+      shuffle(mw).map(w => ({ type: 'meaningToWord', word: w })));
     runDrill({
-      title: '练习 · 以看为主', items: [...a, ...b], pool: words,
+      title: '练习 · 以看为主', items, pool: words,
+      mastery: { get: id => sess.get(id) || 0, hit: id => { const n = Math.min(3, (sess.get(id) || 0) + 1); sess.set(id, n); return n; } },
       onFinish: res => finish(res),
     });
   };
   function finish(res) {
+    for (const w of mw) P.setDot(w.id, sess.get(w.id) || 0);
     const m = modsOf(u).slice();
     while (m.length < u.modules.length) m.push(0);
     m[mi] = 1;
@@ -1202,11 +1279,11 @@ async function startModule(u, mi) {
     const inner = shell('', 1, '');
     inner.append(h('div', { class: 'hero' },
       h('h1', null, unitDone ? '单元完成' : '模块 ' + (mi + 1) + ' 完成'),
-      h('p', null, '首次正确率 ' + acc + '%' + (res.wrong.length ? '，有 ' + res.wrong.length + ' 个词进了难词本。' : '，全部一次答对。')),
+      h('p', null, '首次正确率 ' + acc + '%' + (res.wrong.length ? '，有 ' + res.wrong.length + ' 个词没点满三个点，进了难词本。' : '，每个词都点满了三个点。')),
       unitDone ? h('p', null, '明天复习这个单元，复习后会解锁一篇雅思风格的阅读。') : null));
     if (res.wrong.length) {
       const wl = h('div', { class: 'wl' });
-      res.wrong.forEach(id => { const w = mw.find(x => x.id === id); if (w) wl.append(wordRow(w)); });
+      res.wrong.forEach(id => { const w = mw.find(x => x.id === id); if (w) wl.append(wordRow(w, dotsEl(P.dot(w.id)))); });
       inner.append(wl);
     }
     const nextMi = m.findIndex(x => !x);
@@ -1242,9 +1319,9 @@ function runDeck(mw, onDone, opts = {}) {
         h('div', { class: 'tag-sub', lang: 'en' }, 'Recognition check'),
         h('dl', { class: 'tag-spec' },
           row('词数', N + ' 个'),
-          row('题数', (N * 2) + ' 道'),
-          row('题型', '看词选义　看义选词　例句填空'),
-          row('方式', '以看为主，答对自动进入下一题')),
+          row('题数', (N * 3) + ' 道，每词三次'),
+          row('题型', '看词选义　例句释义　看义选词'),
+          row('方式', '答对一次，点亮一个点')),
         h('div', { class: 'tag-words', lang: 'en' }, mw.map(w => h('span', null, w.w))),
         swipeHint('上滑开始练习 · 下滑回上一个'));
     }
@@ -1436,7 +1513,10 @@ async function startReview(u, stage, free = false) {
     lb.innerHTML = ICON.play;
     const play = (slow) => { lb.classList.add('on'); TTS.speak(speakable(w.w), { rate: slow ? 0.6 : 1, onend: () => lb.classList.remove('on') }); };
     inner.append(h('div', { class: 'q-prompt' }, h('span', { class: 'ask' }, '先听，不看拼写：你想得起它的意思吗？'), lb,
+      w.ipa ? h('div', { class: 'l-ipa' }, '/' + w.ipa + '/') : null,
       h('button', { class: 'link slow', onclick: () => play(true) }, '慢速再听')));
+    const miss = () => { missed.push(w); P.wrong(w.id); P.setDot(w.id, P.dot(w.id) - 1); i++; step(); };
+    const got = () => { known++; if (P.dot(w.id) < 3) P.setDot(w.id, P.dot(w.id) + 1); i++; step(); };
     const foot = h('div', { class: 'foot' });
     const reveal = (claimed) => {
       const card = wordCard(w);
@@ -1445,11 +1525,11 @@ async function startReview(u, stage, free = false) {
       if (claimed) {
         foot.append(h('div', { class: 'note' }, '对照一下，你想的意思对吗？'),
           h('div', { class: 'row2' },
-            h('button', { class: 'btn ghost', onclick: () => { missed.push(w); P.wrong(w.id); i++; step(); } }, '记错了'),
-            h('button', { class: 'btn acc', onclick: () => { known++; i++; step(); } }, '对了')));
-        KEYS.handler = e => { if (e.key === 'ArrowRight' || e.key === 'Enter') { known++; i++; step(); } if (e.key === 'ArrowLeft') { missed.push(w); P.wrong(w.id); i++; step(); } };
+            h('button', { class: 'btn ghost', onclick: miss }, '记错了'),
+            h('button', { class: 'btn acc', onclick: got }, '对了')));
+        KEYS.handler = e => { if (e.key === 'ArrowRight' || e.key === 'Enter') got(); if (e.key === 'ArrowLeft') miss(); };
       } else {
-        missed.push(w); P.wrong(w.id);
+        missed.push(w); P.wrong(w.id); P.setDot(w.id, P.dot(w.id) - 1);
         foot.append(h('button', { class: 'btn acc block', onclick: () => { i++; step(); } }, '跟读一遍，继续'));
         KEYS.handler = e => { if (e.key === 'Enter') { i++; step(); } };
       }
@@ -1933,6 +2013,8 @@ function mergeProgress(a, b) {
   }
   for (const [u, r] of Object.entries(b.read || {})) { const cur = out.read[u]; if (!cur || (r && r.date > cur.date)) out.read[u] = r; }
   for (const [w, n] of Object.entries(b.weak || {})) out.weak[w] = Math.max(out.weak[w] || 0, n);
+  out.dots = out.dots || {};
+  for (const [w, n] of Object.entries(b.dots || {})) out.dots[w] = out.dots[w] == null ? n : Math.max(out.dots[w], n);
   for (const [d, v] of Object.entries(b.days || {})) {
     const cur = Object.assign({}, out.days[d] || {});
     if (v.n && !cur.n) cur.n = v.n;
@@ -2106,27 +2188,37 @@ async function openUnit(u) {
 async function pageWeak() {
   const wrap = h('main', { class: 'wrap' });
   wrap.append(header());
-  const entries = Object.entries(P.data.weak).sort((a, b) => b[1] - a[1]);
-  wrap.append(h('div', { class: 'sec-h' }, h('h2', null, '难词本'), h('span', { class: 'hint' }, '练习或复习里答错、没想起来的词')));
-  if (!entries.length) { wrap.append(h('div', { class: 'empty' }, '还没有难词。')); return wrap; }
+  const entries = Object.entries(P.data.dots).filter(([, n]) => n < 3)
+    .sort((a, b) => a[1] - b[1] || (P.data.weak[b[0]] || 0) - (P.data.weak[a[0]] || 0));
+  wrap.append(h('div', { class: 'sec-h' }, h('h2', null, '难词本'), h('span', { class: 'hint' }, '点越少越不熟 · 三点全亮就移出')));
+  if (!entries.length) { wrap.append(h('div', { class: 'empty' }, '还没有难词。练习时每个词考三次，一次答对点亮一个点；没点满三个点的词会出现在这里。')); return wrap; }
   const units = [...new Set(entries.map(([id]) => id.split('.')[0]))];
   const all = new Map();
   for (const uid of units) (await loadUnit(uid)).forEach(w => all.set(w.id, w));
   const list = entries.map(([id, n]) => [all.get(id), n]).filter(x => x[0]);
+  const by = [0, 1, 2].map(k => list.filter(x => x[1] === k).length);
+  wrap.append(h('div', { class: 'dots-sum' }, [0, 1, 2].map(k => h('span', null, dotsEl(k), h('b', null, by[k]), ' 个'))));
+  const mates = w => { const u = unitById(w.id.split('.')[0]); const ids = u && u.modules.find(m => m.includes(w.id)); return ids ? ids.map(i => all.get(i)).filter(Boolean) : []; };
   wrap.append(h('button', { class: 'btn acc block', onclick: () => {
+    /* the least-known words first; each one only gets the questions it still needs to light its dots */
     const top = list.slice(0, 20).map(x => x[0]);
-    const pool = [...all.values()];
+    const rounds = [0, 1, 2].map(r => shuffle(top.filter(w => P.dot(w.id) <= r)).map(w => formsFor(w, mates(w))[r]));
+    const before = new Map(top.map(w => [w.id, P.dot(w.id)]));
     openOverlay();
-    runDrill({ title: '难词 · 看词选义', items: shuffle(top).map(w => ({ type: 'listenMeaning', word: w, mode: 'see' })), pool,
+    runDrill({ title: '难词 · 补齐三个点', items: joinRounds(...rounds), pool: [...all.values()],
+      mastery: { get: id => P.dot(id), hit: id => P.setDot(id, P.dot(id) + 1) },
       onFinish: res => {
+        const lit = top.reduce((t, w) => t + Math.max(0, P.dot(w.id) - before.get(w.id)), 0);
+        const full = top.filter(w => P.dot(w.id) >= 3 && before.get(w.id) < 3).length;
         const inner = shell('', 1, '');
-        inner.append(h('div', { class: 'hero' }, h('h1', null, '练完了'), h('p', null, '首次答对 ' + res.right + '/' + res.total + '。')),
+        inner.append(h('div', { class: 'hero' }, h('h1', null, '练完了'),
+          h('p', null, '点亮了 ' + lit + ' 个点' + (full ? '，' + full + ' 个词三点全亮，移出难词本。' : '。'))),
           h('div', { class: 'foot' }, h('button', { class: 'btn acc block', onclick: closeOverlay }, '返回')));
         P.save();
       } });
-  } }, '练习前 ' + Math.min(20, list.length) + ' 个难词'));
+  } }, '重点复习 · 最不熟的 ' + Math.min(20, list.length) + ' 个'));
   const wl = h('div', { class: 'wl' });
-  list.forEach(([w, n]) => wl.append(wordRow(w, h('span', { class: 'wc', title: '答错次数' }, '×' + n))));
+  list.forEach(([w, n]) => wl.append(wordRow(w, dotsEl(n))));
   wrap.append(wl);
   return wrap;
 }
