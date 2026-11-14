@@ -385,7 +385,7 @@ img { max-width: 100%; }
 .endcard .swipe-hint { align-self: stretch; }
 .foot .hold-hint { margin-top: 0; padding: 4px 0 2px; cursor: pointer; animation: qin .3s ease both; }
 .ov.holding { overscroll-behavior: none; }
-.ov.pinned { overflow: hidden; }
+.ov.pinned { overflow: hidden; touch-action: none; }
 .ov-in.ghost { position: absolute; left: 0; right: 0; top: 0; min-height: 0; pointer-events: none; z-index: 5; }
 .ov-in.ghost .ov-top, .ov-in.ghost .phase { visibility: hidden; }
 .qbox.rise { animation: qrise .38s cubic-bezier(.2,.8,.2,1) both; }
@@ -1332,8 +1332,10 @@ function runDrill({ title, items, pool, onFinish, retry = true, mastery }) {
       KEYS.handler = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); step(); } };
       next.focus({ preventScroll: true });
     }, it);
-    /* only the listening items speak on their own */
-    if (it.mode === 'listen' && P.settings().autoplay) play();
+    /* listening items speak on their own; review items read the word as it appears */
+    if ((it.mode === 'listen' || it.say) && P.settings().autoplay) {
+      if (it.type === 'sentenceMeaning') sayWord(it.word); else play();
+    }
   };
   step();
 }
@@ -1346,8 +1348,13 @@ function holdForSwipe(inner, box, foot, next) {
   const parts = [box, foot];
   /* the entrance animation keeps transform/opacity pinned; drop it so the drag can move them */
   parts.forEach(el => { el.style.animation = 'none'; el.style.willChange = 'transform'; });
+  /* iOS commits a gesture to native scrolling on its first move, after which the drag can't follow the finger.
+     So: glide to the end of the screen once, then pin it, and every upward swipe is ours from the first pixel. */
   OV.classList.add('holding');
-  if (OV.scrollHeight <= OV.clientHeight + 2) OV.classList.add('pinned');
+  const extra = OV.scrollHeight - OV.clientHeight - OV.scrollTop;
+  if (extra > 2 && !REDUCED) { OV.scrollTo({ top: OV.scrollHeight, behavior: 'smooth' }); setTimeout(() => { if (!gone && live()) OV.classList.add('pinned'); }, 360); }
+  else { if (extra > 2) OV.scrollTop = OV.scrollHeight; OV.classList.add('pinned'); }
+  const pinned = () => OV.classList.contains('pinned');
   const set = (tr, op, trans) => parts.forEach(el => { el.style.transition = trans || 'none'; el.style.transform = tr; el.style.opacity = op; });
   const H = () => OV.clientHeight;
   const atBottom = () => OV.scrollTop + OV.clientHeight >= OV.scrollHeight - 2;
@@ -1388,7 +1395,7 @@ function holdForSwipe(inner, box, foot, next) {
     if (dt > 0) vel = 0.7 * ((t.clientY - lastY) / dt) + 0.3 * vel;
     lastY = t.clientY; lastT = e.timeStamp;
     if (!mode) {
-      if (!(dy < 0 && atBottom())) return;        /* let a long screen scroll first */
+      if (!(dy < 0 && (pinned() || atBottom()))) return;
       e.preventDefault();
       if (Math.abs(dy) < Math.abs(dx)) return;
       mode = 'up';
@@ -1693,84 +1700,53 @@ function runDeck(mw, onDone, opts = {}) {
 async function startReview(u, stage, free = false) {
   const words = await loadUnit(u.id);
   openOverlay();
-  const order = shuffle(words);
-  const total = order.length;
-  let i = 0, known = 0;
-  const missed = [];
   const title = free ? '自由复习 · ' + unitLabel(u) : '第 ' + stage + ' 次复习 · ' + unitLabel(u);
-  const step = () => {
-    if (i >= total) return retryMissed();
-    const w = order[i];
-    const inner = shell(title, i / total, (i + 1) + '/' + total, async () => {
-      if (await confirmBox('退出复习？', '本次复习还没完成，退出后需要重新开始。', '退出', '继续复习')) closeOverlay();
-    });
-    const lb = h('button', { class: 'listen', 'aria-label': '再听', onclick: () => play() });
-    lb.innerHTML = ICON.play;
-    const play = (slow) => { lb.classList.add('on'); TTS.speak(speakable(w.w), { rate: slow ? 0.6 : 1, onend: () => lb.classList.remove('on') }); };
-    inner.append(h('div', { class: 'q-prompt' }, h('span', { class: 'ask' }, '先听，不看拼写：你想得起它的意思吗？'), lb,
-      w.ipa ? h('div', { class: 'l-ipa' }, '/' + w.ipa + '/') : null,
-      h('button', { class: 'link slow', onclick: () => play(true) }, '慢速再听')));
-    const miss = () => { missed.push(w); P.wrong(w.id); P.setDot(w.id, P.dot(w.id) - 1); i++; step(); };
-    const got = () => { known++; if (P.dot(w.id) < 3) P.setDot(w.id, P.dot(w.id) + 1); i++; step(); };
-    const foot = h('div', { class: 'foot' });
-    const reveal = (claimed) => {
-      const card = wordCard(w);
-      inner.insertBefore(card, foot);
-      foot.textContent = '';
-      if (claimed) {
-        foot.append(h('div', { class: 'note' }, '对照一下，你想的意思对吗？'),
-          h('div', { class: 'row2' },
-            h('button', { class: 'btn ghost', onclick: miss }, '记错了'),
-            h('button', { class: 'btn acc', onclick: got }, '对了')));
-        KEYS.handler = e => { if (e.key === 'ArrowRight' || e.key === 'Enter') got(); if (e.key === 'ArrowLeft') miss(); };
-      } else {
-        missed.push(w); P.wrong(w.id); P.setDot(w.id, P.dot(w.id) - 1);
-        foot.append(h('button', { class: 'btn acc block', onclick: () => { i++; step(); } }, '跟读一遍，继续'));
-        KEYS.handler = e => { if (e.key === 'Enter') { i++; step(); } };
+  const total = words.length;
+  /* round 1: see the word (it is read aloud), pick its meaning — one try each */
+  runDrill({
+    title, pool: words, retry: false,
+    items: shuffle(words).map(w => ({ type: 'listenMeaning', word: w, mode: 'see', say: true })),
+    onFinish: res => {
+      const missedIds = new Set(res.wrong);
+      for (const w of words) {
+        if (missedIds.has(w.id)) P.setDot(w.id, P.dot(w.id) - 1);
+        else if (P.dot(w.id) < 3) P.setDot(w.id, P.dot(w.id) + 1);
       }
-      card.scrollIntoView({ block: 'nearest' });
-    };
-    foot.append(h('div', { class: 'row2' },
-      h('button', { class: 'btn ghost', onclick: () => reveal(false) }, '想不起来'),
-      h('button', { class: 'btn acc', onclick: () => reveal(true) }, '想起来了')));
-    inner.append(foot);
-    KEYS.handler = e => {
-      if (e.key === ' ') { e.preventDefault(); play(); }
-      if (e.key === 'ArrowRight' || e.key === 'Enter') reveal(true);
-      if (e.key === 'ArrowLeft') reveal(false);
-    };
-    if (P.settings().autoplay) play();
-  };
-  const retryMissed = () => {
-    if (!missed.length) return finish({ total, right: total, wrong: [] });
-    const inner = shell(title, 1, '');
-    inner.append(h('div', { class: 'hero' }, h('h1', null, '再听一轮'), h('p', null, missed.length + ' 个没想起来的词，用听音选义再过一遍。')));
-    inner.append(h('div', { class: 'foot' }, h('button', { class: 'btn acc block', onclick: () => {
-      runDrill({ title: '回炉 · 看词选义', items: shuffle(missed).map(w => ({ type: 'listenMeaning', word: w, mode: 'see' })), pool: words, retry: true,
-        onFinish: () => finish({ total, right: known, wrong: missed.map(w => w.id) }) });
-    } }, '开始')));
-  };
-  const finish = (res) => {
+      const missed = words.filter(w => missedIds.has(w.id));
+      const known = total - missed.length;
+      if (!missed.length) return finish(known, []);
+      /* round 2: every miss again, this time inside its example sentence */
+      const inner = shell(title, 1, '');
+      inner.append(h('div', { class: 'hero' }, h('h1', null, '第二轮 · 例句'),
+        h('p', null, missed.length + ' 个词刚才选错了，放进例句里再认一遍。')));
+      inner.append(h('div', { class: 'foot' }, h('button', { class: 'btn acc block', onclick: () => {
+        runDrill({ title: '第二轮 · 例句', pool: words, retry: true,
+          items: shuffle(missed).map(w => clozeOf(w) ? { type: 'sentenceMeaning', word: w, near: missed, say: true } : { type: 'listenMeaning', word: w, mode: 'see', say: true }),
+          onFinish: () => finish(known, missed.map(w => w.id)) });
+      } }, '开始')));
+      KEYS.handler = e => { if (e.key === 'Enter') inner.querySelector('.foot .btn').click(); };
+    },
+  });
+  const finish = (right, wrong) => {
     if (!free) {
       const rv = Object.assign({}, P.data.rev[u.id] || {});
       rv[stage] = today();
       P.data.rev[u.id] = rv;
       P.markDay('r', u.id + ':' + stage);
-      P.save();
     }
+    P.save();
     const inner = shell('', 1, '');
     const unlock = !free && stage === 1 && !P.data.read[u.id];
     inner.append(h('div', { class: 'hero' },
       h('h1', null, free ? '复习完成' : '第 ' + stage + ' 次复习完成'),
-      h('p', null, '一听就想起来 ' + res.right + '/' + res.total + ' 个。' + (res.wrong.length ? res.wrong.length + ' 个已加入难词本。' : '')),
-      !free && stage < INTERVALS.length ? h('p', null, '下一次复习：' + fmtDate(nextReviewDate(u.id).due) + '。') : null,
+      h('p', null, '一眼认出 ' + right + '/' + total + ' 个。' + (wrong.length ? wrong.length + ' 个熄灭了一个点，已在难词本里。' : '')),
+      !free && stage < INTERVALS.length && (nextReviewDate(u.id) || {}).due ? h('p', null, '下一次复习：' + fmtDate(nextReviewDate(u.id).due) + '。') : null,
       unlock ? h('p', null, '这个单元的雅思阅读已解锁。') : null));
     inner.append(h('div', { class: 'foot' },
       unlock ? h('button', { class: 'btn acc block', onclick: () => openReading(u) }, '去做阅读') : null,
       h('button', { class: 'btn block ' + (unlock ? 'ghost' : 'acc'), onclick: closeOverlay }, '返回')));
     KEYS.handler = null;
   };
-  step();
 }
 function fmtDate(s) {
   const d = diffDays(s, today());
