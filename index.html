@@ -518,7 +518,7 @@ img { max-width: 100%; }
     <a href="#settings" id="nav-settings"><span class="g">Settings</span>设置</a>
   </div>
 </nav>
-<script>window.OFFLINE_EDITION = true;</script>
+<script>window.OFFLINE_EDITION = true; window.APP_BUILD = "11-17 23:00 \u00b7 f4df72";</script>
 <script>
 "use strict";
 /* ============================================================ utilities */
@@ -756,7 +756,7 @@ const Store = {
 const INTERVALS = [1, 2, 4, 7, 15];
 const P = {
   data: null, unsub: null, saving: false, dirty: false, timer: null, listeners: [],
-  blank() { return { v: 1, learned: {}, mods: {}, rev: {}, read: {}, weak: {}, dots: {}, sdots: {}, days: {}, settings: { accent: 'en-GB', rate: 0.92, autoplay: true } }; },
+  blank() { return { v: 1, learned: {}, mods: {}, rev: {}, read: {}, weak: {}, dots: {}, sdots: {}, wl: {}, days: {}, settings: { accent: 'en-GB', rate: 0.92, autoplay: true } }; },
   settings() { return (this.data && this.data.settings) || { accent: 'en-GB', rate: 0.92, autoplay: true }; },
   async load() {
     let d = null;
@@ -786,6 +786,7 @@ const P = {
         this.data = Object.assign(this.blank(), remote);
         this.data.dots = this.data.dots || {};
         this.data.sdots = this.data.sdots || {};
+        this.data.wl = this.data.wl || {};
         this.data.settings = Object.assign(this.blank().settings, remote.settings || {});
         IDB.set('progress', this.data);
         this.listeners.forEach(f => f());
@@ -814,6 +815,19 @@ const P = {
     else { day[field] = day[field] || []; if (!day[field].includes(val)) day[field].push(val); }
   },
   wrong(wid) { this.data.weak[wid] = (this.data.weak[wid] || 0) + 1; },
+  /* which words have been learned, word by word: survives any regrouping of modules */
+  isLearned(id) { const i = id.lastIndexOf('.'), s = (this.data.wl || {})[id.slice(0, i)]; return !!s && s[+id.slice(i + 1) - 1] === '1'; },
+  markLearned(ids) {
+    this.data.wl = this.data.wl || {};
+    const by = {};
+    for (const id of ids) { const i = id.lastIndexOf('.'); (by[id.slice(0, i)] = by[id.slice(0, i)] || []).push(+id.slice(i + 1) - 1); }
+    for (const [u, idx] of Object.entries(by)) {
+      const a = (this.data.wl[u] || '').split('');
+      for (const k of idx) { while (a.length <= k) a.push('0'); a[k] = '1'; }
+      this.data.wl[u] = a.join('');
+    }
+  },
+  learnedIn(u) { const s = (this.data.wl || {})[u.id] || ''; let n = 0; for (const c of s) if (c === '1') n++; return n; },
   /* words never scored are treated as known; 0–2 lit dots puts a word in 难词 */
   dot(id) { const v = this.data.dots[id]; return v == null ? 3 : v; },
   setDot(id, n) { this.data.dots[id] = Math.max(0, Math.min(3, n)); return this.data.dots[id]; },
@@ -823,7 +837,67 @@ const P = {
 let SYN = null;             // synonym groups {title, source, groups:[...]}, imported separately
 let META = null;            // {title, chapters, units:[...]}
 const UNIT_CACHE = new Map();
-async function loadMeta() { META = await Store.getContent('meta'); return META; }
+async function loadMeta() {
+  META = await Store.getContent('meta');
+  if (META && Array.isArray(META.units)) {
+    const seeded = seedWordLevel(META);              /* before regrouping, while old modules still match old flags */
+    if (META.grouping !== 'book-10') await regroupTen(META);
+    if (seeded) await P.flush();
+  }
+  return META;
+}
+function seedWordLevel(meta) {
+  if (!P.data) return false;
+  const before = JSON.stringify(P.data.wl || {});
+  for (const u of meta.units) {
+    if (P.data.learned[u.id]) { P.markLearned(u.words || u.modules.flat()); continue; }
+    const om = P.data.mods[u.id];
+    if (Array.isArray(om)) u.modules.forEach((ids, k) => { if (om[k]) P.markLearned(ids); });
+  }
+  /* a word with a dot record went through a practice at least once */
+  P.markLearned(Object.keys(P.data.dots || {}).filter(id => /^U\d+\.\d+$/.test(id)));
+  return JSON.stringify(P.data.wl) !== before;
+}
+/* The book's themed groups (3–8 words) are joined, in order, into about ten modules per unit, as even as
+   possible and never splitting a group. Small units keep modules of 8+ words. Finished modules carry over:
+   a new module counts as done when all of its words were in modules already finished. */
+function partitionRuns(sizes, k) {
+  const m = sizes.length, n = sizes.reduce((a, b) => a + b, 0);
+  k = Math.min(k, m);
+  const t = n / k, pre = [0];
+  sizes.forEach(x => pre.push(pre[pre.length - 1] + x));
+  const best = Array.from({ length: k + 1 }, () => new Array(m + 1).fill(Infinity));
+  const cut = Array.from({ length: k + 1 }, () => new Array(m + 1).fill(0));
+  best[0][0] = 0;
+  for (let j = 1; j <= k; j++) for (let i = 1; i <= m; i++) for (let a = j - 1; a < i; a++) {
+    if (best[j - 1][a] === Infinity) continue;
+    const c = best[j - 1][a] + (pre[i] - pre[a] - t) ** 2;
+    if (c < best[j][i]) { best[j][i] = c; cut[j][i] = a; }
+  }
+  const out = [];
+  for (let j = k, i = m; j > 0; j--) { const a = cut[j][i]; out.unshift([a, i]); i = a; }
+  return out;
+}
+async function regroupTen(meta) {
+  let progress = false;
+  for (const u of meta.units) {
+    const groups = u.modules || [];
+    const k = Math.min(10, Math.max(1, Math.round(u.count / 10)));
+    if (groups.length <= k) continue;
+    const mods = partitionRuns(groups.map(g => g.length), k).map(([a, b]) => groups.slice(a, b).flat());
+    const om = P.data && P.data.mods[u.id];
+    if (Array.isArray(om)) {
+      const done = new Set();
+      groups.forEach((ids, i) => { if (om[i]) ids.forEach(id => done.add(id)); });
+      P.data.mods[u.id] = mods.map(ids => (P.data.learned[u.id] || ids.every(id => done.has(id))) ? 1 : 0);
+      progress = true;
+    }
+    u.modules = mods;
+  }
+  meta.grouping = 'book-10';
+  try { await Store.putContent('meta', meta); } catch (e) {}
+  if (progress) await P.flush();
+}
 function unitById(id) { return META.units.find(u => u.id === id); }
 async function loadUnit(id) {
   if (UNIT_CACHE.has(id)) return UNIT_CACHE.get(id);
@@ -892,8 +966,12 @@ function streak() {
   while (active(d)) { n++; d = addDays(d, -1); }
   return n;
 }
-function learnedWordCount() { return META ? META.units.filter(u => P.data.learned[u.id]).reduce((s, u) => s + u.count, 0) : 0; }
-function modsOf(u) { const m = P.data.mods[u.id]; return Array.isArray(m) ? m : []; }
+function learnedWordCount() { return META ? META.units.reduce((s, u) => s + (P.data.learned[u.id] ? u.count : Math.min(u.count, P.learnedIn(u))), 0) : 0; }
+function modsOf(u) {
+  const old = P.data.mods[u.id] || [], all = !!P.data.learned[u.id];
+  return u.modules.map((ids, k) => (all || old[k] || ids.every(id => P.isLearned(id))) ? 1 : 0);
+}
+function partOf(u, ids) { return ids.filter(id => P.isLearned(id)).length; }
 
 /* ============================================================ meaning helpers */
 const POS_RE = /\b(n|v|vt|vi|adj|adv|prep|conj|pron|num|abbr|int|interj|art|aux)\.\s*/g;
@@ -1310,7 +1388,7 @@ const EX = {
 };
 
 /* Generic drill runner: queue of {type, word}; wrong answers come back at the end. */
-function runDrill({ title, items, pool, onFinish, retry = true, mastery }) {
+function runDrill({ title, items, pool, onFinish, retry = true, mastery, quick = false }) {
   const queue = items.slice();
   const total = queue.length;
   let doneCount = 0, right = 0, wrongSet = new Set(), riseNext = false;
@@ -1339,7 +1417,7 @@ function runDrill({ title, items, pool, onFinish, retry = true, mastery }) {
         /* the sentence question shows a translation: stay until the learner swipes up, as in the card deck */
         if (it.type === 'sentenceMeaning') { holdForSwipe(inner, box, foot, rise => { riseNext = rise; step(); }); return; }
         /* quick rhythm: just long enough to see the green and the new dot */
-        setTimeout(step, REDUCED ? 150 : lit === 3 ? 640 : it.dots ? 300 : 260);
+        setTimeout(step, REDUCED ? 150 : lit === 3 ? 640 : it.dots ? 300 : quick ? 170 : 260);
         return;
       }
       wrongSet.add(it.word.id); if (!it.word.syn) P.wrong(it.word.id);
@@ -1620,6 +1698,7 @@ async function startModule(u, mi) {
   };
   function finish(res) {
     for (const w of mw) P.setDot(w.id, sess.get(w.id) || 0);
+    P.markLearned(mw.map(w => w.id));
     const m = modsOf(u).slice();
     while (m.length < u.modules.length) m.push(0);
     m[mi] = 1;
@@ -1855,7 +1934,7 @@ async function startReview(u, stage, free = false) {
   const total = words.length;
   /* round 1: see the word (it is read aloud), pick its meaning — one try each */
   runDrill({
-    title, pool: words, retry: false,
+    title, pool: words, retry: false, quick: true,
     items: shuffle(words).map(w => ({ type: 'listenMeaning', word: w, mode: 'see', say: true })),
     onFinish: res => {
       const missedIds = new Set(res.wrong);
@@ -1871,7 +1950,7 @@ async function startReview(u, stage, free = false) {
       inner.append(h('div', { class: 'hero' }, h('h1', null, '第二轮 · 例句'),
         h('p', null, missed.length + ' 个词刚才选错了，放进例句里再认一遍。')));
       inner.append(h('div', { class: 'foot' }, h('button', { class: 'btn acc block', onclick: () => {
-        runDrill({ title: '第二轮 · 例句', pool: words, retry: true,
+        runDrill({ title: '第二轮 · 例句', pool: words, retry: true, quick: true,
           items: shuffle(missed).map(w => clozeOf(w) ? { type: 'sentenceMeaning', word: w, near: missed, say: true } : { type: 'listenMeaning', word: w, mode: 'see', say: true }),
           onFinish: () => finish(known, missed.map(w => w.id)) });
       } }, '开始')));
@@ -2337,6 +2416,11 @@ function mergeProgress(a, b) {
   for (const [w, n] of Object.entries(b.weak || {})) out.weak[w] = Math.max(out.weak[w] || 0, n);
   out.dots = out.dots || {};
   out.sdots = out.sdots || {};
+  out.wl = out.wl || {};
+  for (const [u, str] of Object.entries(b.wl || {})) {
+    const a = out.wl[u] || '';
+    out.wl[u] = Array.from({ length: Math.max(a.length, str.length) }, (_, i) => (a[i] === '1' || str[i] === '1') ? '1' : '0').join('');
+  }
   for (const [w, n] of Object.entries(b.sdots || {})) out.sdots[w] = out.sdots[w] == null ? n : Math.max(out.sdots[w], n);
   for (const [w, n] of Object.entries(b.dots || {})) out.dots[w] = out.dots[w] == null ? n : Math.max(out.dots[w], n);
   for (const [d, v] of Object.entries(b.days || {})) {
@@ -2361,7 +2445,20 @@ async function importProgress(text) {
   const obj = JSON.parse(text.slice(i, j + 1));
   if (!obj || obj['zhenjing-progress'] !== 1 || !obj.progress) throw new Error('这不是进度数据');
   const settings = P.data.settings;
-  P.data = Object.assign(P.blank(), mergeProgress(Object.assign(P.blank(), P.data), Object.assign(P.blank(), obj.progress)));
+  const inc = Object.assign(P.blank(), obj.progress);
+  /* modules differ between versions, words don't: carry progress over as learned words only.
+     An export from an older version has no word list, so its module flags are used only where
+     the module layout is the same as here. */
+  if (!obj.progress.wl && META) {
+    const keep = P.data.wl; P.data.wl = {};
+    for (const [uid, m] of Object.entries(inc.mods || {})) {
+      const mu = META.units.find(x => x.id === uid);
+      if (mu && Array.isArray(m) && m.length === mu.modules.length) mu.modules.forEach((ids, k) => { if (m[k]) P.markLearned(ids); });
+    }
+    inc.wl = P.data.wl; P.data.wl = keep;
+  }
+  inc.mods = {};
+  P.data = Object.assign(P.blank(), mergeProgress(Object.assign(P.blank(), P.data), inc));
   P.data.settings = settings;
   await P.flush();
   for (const [uid, doc] of Object.entries(obj.readings || {})) {
@@ -2377,7 +2474,7 @@ function pasteProgressDialog() {
     h('div', { class: 'note' }, '两边的进度会合并：学过的单元、复习记录、阅读成绩和难词都保留，不会覆盖。'), ta, msg,
     h('div', { class: 'row2' }, h('button', { class: 'btn ghost', onclick: () => bg.remove() }, '取消'),
       h('button', { class: 'btn acc', onclick: async () => {
-        try { await importProgress(ta.value); bg.remove(); toast('进度已合并'); route(); }
+        try { await importProgress(ta.value); seedWordLevel(META); await P.flush(); bg.remove(); toast('进度已合并 · 已学 ' + learnedWordCount() + ' 词'); route(); }
         catch (e) { msg.textContent = '没能读取：' + (e.message || '格式不对'); }
       } }, '合并'))));
   document.body.append(bg);
@@ -2444,8 +2541,8 @@ function pageToday() {
     const pending = reviews.length;
     const row = h('div', { class: 'task' + (doneToday ? '' : '') },
       h('span', { class: 'unum' }, 'U' + unitNo(nu)),
-      h('div', null, h('div', { class: 't1' }, unitLabel(nu)), h('div', { class: 't2' }, nu.count + ' 词 · ' + nu.modules.length + ' 个模块' + (dn ? ' · 已完成 ' + dn : '')),
-        dn ? h('div', { class: 'bar', style: { marginTop: '6px' } }, h('i', { style: { width: (dn / nu.modules.length * 100) + '%' } })) : null),
+      h('div', null, h('div', { class: 't1' }, unitLabel(nu)), h('div', { class: 't2' }, nu.count + ' 词 · ' + nu.modules.length + ' 个模块' + (P.learnedIn(nu) ? ' · 已学 ' + P.learnedIn(nu) + ' 词' : '')),
+        P.learnedIn(nu) ? h('div', { class: 'bar', style: { marginTop: '6px' } }, h('i', { style: { width: (Math.min(1, P.learnedIn(nu) / nu.count) * 100) + '%' } })) : null),
       h('button', { class: 'btn ' + (doneToday ? 'ghost' : 'acc'), onclick: () => openUnit(nu) }, doneToday ? '提前学' : (dn ? '继续' : '开始')));
     wrap.append(row);
     if (pending && !doneToday) wrap.append(h('div', { class: 'note' }, '建议先完成上面的复习，再学新单元。'));
@@ -2478,7 +2575,7 @@ function pageUnits() {
       const rv = P.data.rev[u.id] || {};
       const nx = nextReviewDate(u.id);
       const status = L ? h('div', { class: 'stages', title: '复习进度' }, INTERVALS.map((_, k) => h('i', { class: rv[k + 1] ? 'd' : (nx && nx.stage === k + 1 && nx.due <= today() ? 'due' : '') })))
-        : dn ? h('span', { class: 'chip acc' }, dn + '/' + u.modules.length) : h('span', { class: 'chip' }, '未开始');
+        : P.learnedIn(u) ? h('span', { class: 'chip acc' }, Math.min(u.count, P.learnedIn(u)) + '/' + u.count + ' 词') : h('span', { class: 'chip' }, '未开始');
       box.append(h('button', { class: 'urow', onclick: () => openUnit(u) },
         h('span', { class: 'unum' }, 'U' + unitNo(u)),
         h('div', null, h('div', { class: 't1' }, unitLabel(u)), h('div', { class: 't2', style: { fontSize: '13px', color: 'var(--muted)' } }, u.count + ' 词' + (L ? ' · ' + (nx ? '下次复习 ' + fmtDate(nx.due) : '复习全部完成') : ''))),
@@ -2504,7 +2601,7 @@ async function openUnit(u) {
   u.modules.forEach((ids, k) => {
     const names = ids.map(id => (words.find(w => w.id === id) || {}).w).filter(Boolean);
     path.append(h('button', { class: 'node' + (m[k] ? ' done' : '') + (k === nextMi ? ' next' : ''), onclick: () => startModule(u, k) },
-      h('span', { class: 'm' }, (m[k] ? '✓ ' : '') + (k + 1), h('small', null, ids.length + ' 词')),
+      h('span', { class: 'm' }, (m[k] ? '✓ ' : '') + (k + 1), h('small', null, m[k] || !partOf(u, ids) ? ids.length + ' 词' : '已学 ' + partOf(u, ids) + '/' + ids.length)),
       h('span', { class: 'w', lang: 'en' }, names.join(' · '))));
   });
   inner.append(path);
@@ -2589,11 +2686,26 @@ function pageSettings() {
         ? '离线版的进度只存在这台设备上。想和在线版（或另一台设备）同步：一边点「复制进度」，把文字发到另一边，再点「粘贴并合并」。'
         : '在线版在你的 iPhone 和 Mac 之间自动同步。要和离线版互通：一边点「复制进度」，把文字发到另一边，再点「粘贴并合并」。'),
       h('div', { class: 'row2' },
-        h('button', { class: 'btn ghost', onclick: async () => copyText(await exportProgress(), '进度已复制') }, '复制进度'),
+        h('button', { class: 'btn ghost', onclick: async () => copyText(await exportProgress(), '进度已复制 · 已学 ' + learnedWordCount() + ' 词') }, '复制进度'),
         h('button', { class: 'btn ghost', onclick: pasteProgressDialog }, '粘贴并合并'))));
+  const ver = h('span', null, window.APP_BUILD || '在线版（随 Claude 页面更新）');
+  wrap.append(h('div', { class: 'sec-h' }, h('h2', null, '程序版本')),
+    h('div', { class: 'set' },
+      h('div', null, h('b', null, '当前版本 '), ver,
+        h('div', { class: 'note' }, '更新上传到 GitHub 后，打开 App 会在后台下载新版本并自动刷新；也可以点下面的按钮立即检查。')),
+      window.OFFLINE_EDITION ? h('button', { class: 'btn ghost', onclick: e => checkUpdate(e.currentTarget) }, '检查更新') : null));
   wrap.append(h('div', { class: 'sec-h' }, h('h2', null, 'Mac 键盘')),
     h('div', { class: 'set note' }, '空格：再听一遍　1–4 / A–D：选择　回车：继续　← →：想不起来 / 想起来了'));
   return wrap;
+}
+
+async function checkUpdate(btn) {
+  const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration().catch(() => null);
+  if (!reg) { toast('还没有离线缓存，联网打开一次即可'); return; }
+  btn.disabled = true; btn.textContent = '正在检查…';
+  try { await reg.update(); } catch (e) { btn.disabled = false; btn.textContent = '检查更新'; toast('连不上网络，稍后再试'); return; }
+  if (reg.installing || reg.waiting) { btn.textContent = '正在下载新版本…'; setTimeout(() => location.reload(), 6000); }
+  else { btn.disabled = false; btn.textContent = '检查更新'; toast('已经是最新版本'); }
 }
 
 /* ============================================================ import */
@@ -2655,7 +2767,7 @@ async function doImport(data, report) {
   }
   if (!data || data.format !== 'zhenjing-vocab/1' || !Array.isArray(data.units) || !data.words) throw { userMsg: '这不是本程序的词库文件' };
   const imgs = data.images || {};
-  const meta = { format: data.format, title: data.title, chapters: data.chapters, units: data.units, imported: today() };
+  const meta = { format: data.format, title: data.title, chapters: data.chapters, units: data.units, imported: today(), grouping: data.grouping };
   const unitDocs = data.units.map(u => ({ key: 'u_' + u.id, val: { words: u.words.map(id => data.words[id]).filter(Boolean) } }));
   const imgDocs = Object.entries(imgs).map(([id, d]) => ({ key: 'img_' + id, val: { d } }));
   const all = [...unitDocs, ...imgDocs];
@@ -2769,7 +2881,15 @@ boot();
 </script>
 <script>
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+  const hadController = !!navigator.serviceWorker.controller;
+  window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').then(r => r.update()).catch(() => {}); });
+  /* a new version has taken over: reload into it, but never in the middle of a practice */
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || window.__reloading) return;
+    const go = () => { if (typeof OV !== 'undefined' && OV) return setTimeout(go, 1500); window.__reloading = true; try { sessionStorage.setItem('zj-updated', '1'); } catch (e) {} location.reload(); };
+    go();
+  });
+  try { if (sessionStorage.getItem('zj-updated')) { sessionStorage.removeItem('zj-updated'); setTimeout(() => { try { toast('已更新到新版本 ' + (window.APP_BUILD || '')); } catch (e) {} }, 800); } } catch (e) {}
 }
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 </script>
