@@ -473,6 +473,29 @@ img { max-width: 100%; }
 .sm-hit { background: none; color: var(--hit); font-weight: 700; }
 .sm-zh { font-size: 15px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px; animation: qin .24s ease both; }
 @media (min-width: 900px) { .head .hw { --hw-max: 52px; } }
+/* Italian line under the meaning */
+.it-row { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 6px; margin-top: 2px; }
+.lang-tag { align-self: center; font-family: var(--f-display); font-weight: 700; font-size: 11px; letter-spacing: 1px; padding: 2px 6px; border-radius: 6px; border: 1.5px solid #1F8A5B; color: #1F8A5B; }
+.it-w { font-family: var(--f-word); font-size: 19px; color: var(--ink); background: none; border: 0; padding: 2px 2px; cursor: pointer; }
+.it-sep { color: var(--muted); }
+.it-g { font-size: 13px; color: var(--muted); font-style: normal; }
+.it-near { color: var(--muted); }
+/* easily confused words */
+.conf { background: var(--surface2, var(--bg)); border: 1px solid var(--line); border-radius: max(16px, calc(var(--card-r) - 14px)); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.conf-h { display: flex; align-items: baseline; gap: 10px; }
+.conf-h b { color: var(--hit); font-size: 14px; letter-spacing: 2px; }
+.conf-h span { font-family: var(--f-display); font-weight: 600; font-size: 11px; letter-spacing: 3px; color: var(--muted); }
+.conf-set { display: flex; flex-direction: column; gap: 6px; }
+.conf-set + .conf-set { border-top: 1px dashed var(--line); padding-top: 10px; }
+.conf-tip { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.5; }
+.conf-row { display: grid; grid-template-columns: minmax(84px, max-content) 1fr; gap: 10px; align-items: baseline; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.conf-w { font-family: var(--f-word); font-size: 17px; font-weight: 600; color: var(--ink); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.conf-row.me .conf-w { color: var(--hit); }
+.conf-row.me .conf-d { color: var(--ink); }
+.it-diff { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
+.it-diff b { font-family: var(--f-word); font-weight: 600; color: var(--ink); }
+.it-diff .conf-row.me b { color: var(--hit); }
+.it-near b { color: var(--ink); font-family: var(--f-word); font-weight: 600; }
 /* synonyms */
 .synlist { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
 .syncard { gap: 8px; padding: 18px 20px; }
@@ -518,7 +541,7 @@ img { max-width: 100%; }
     <a href="#settings" id="nav-settings"><span class="g">Settings</span>设置</a>
   </div>
 </nav>
-<script>window.OFFLINE_EDITION = true; window.APP_BUILD = "11-17 23:00 \u00b7 f4df72";</script>
+<script>window.OFFLINE_EDITION = true; window.EDITION = "main"; window.APP_BUILD = "11-21 16:09 \u00b7 8ad772";</script>
 <script>
 "use strict";
 /* ============================================================ utilities */
@@ -602,8 +625,10 @@ const TTS = {
     const go = (retry) => {
       if (seq !== this.seq) return end();
       const u = new SpeechSynthesisUtterance(String(text).replace(/\*\*/g, ''));
-      u.lang = (this.voice && this.voice.lang) || s.accent || 'en-GB';
-      if (this.voice) u.voice = this.voice;
+      const other = opts.lang && this.voices.filter(v => (v.lang || '').replace('_', '-').toLowerCase().startsWith(opts.lang.slice(0, 2).toLowerCase()));
+      const vo = other ? (other.find(v => /enhanced|premium/i.test(v.name)) || other.find(v => /Alice|Federica|Luca/i.test(v.name)) || other[0] || null) : this.voice;
+      u.lang = opts.lang || (this.voice && this.voice.lang) || s.accent || 'en-GB';
+      if (vo) u.voice = vo;
       u.rate = (opts.rate || 1) * (s.rate || 0.92);
       u.volume = 1;
       let started = false;
@@ -680,7 +705,7 @@ const IDB = {
     if (this.db !== null) return this.db;
     try {
       this.db = await new Promise((res, rej) => {
-        const r = indexedDB.open('zhenjing-listen', 1);
+        const r = indexedDB.open('zhenjing-listen' + (window.EDITION && window.EDITION !== 'main' ? '-' + window.EDITION : ''), 1);
         r.onupgradeneeded = () => r.result.createObjectStore('kv');
         r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
       });
@@ -834,6 +859,7 @@ const P = {
 };
 
 /* ============================================================ content */
+let PLUS = null;            // per-word extras {words:{id:{it, syn, col, its}}}, imported separately
 let SYN = null;             // synonym groups {title, source, groups:[...]}, imported separately
 let META = null;            // {title, chapters, units:[...]}
 const UNIT_CACHE = new Map();
@@ -1129,6 +1155,26 @@ function etyBlock(note) {
 }
 
 /* ============================================================ word card */
+function confusionBlock(w) {
+  const unit = UNIT_CACHE.get(w.id.split('.')[0]) || [];
+  const byId = new Map(unit.map(x => [x.id, x]));
+  let sets = (CONF_BY.get(w.id) || []).map(set => ({ tip: set.tip, items: set.ids.map(id => [byId.get(id), set.notes[id]]).filter(x => x[0]) }));
+  if (!sets.length) {
+    /* no curated set: line up same-kind words whose meanings overlap */
+    const p = posOfM(w.m);
+    const near = unit.filter(x => x.id !== w.id && posOfM(x.m) === p && confusable(w, x)).slice(0, 3);
+    if (near.length) sets = [{ tip: '', items: [[w, ''], ...near.map(x => [x, ''])] }];
+  }
+  sets = sets.filter(st => st.items.length > 1);
+  if (!sets.length) return null;
+  return h('section', { class: 'conf' },
+    h('div', { class: 'conf-h' }, h('b', null, '辨析'), h('span', { lang: 'en' }, 'EASILY CONFUSED')),
+    sets.map(st => h('div', { class: 'conf-set' },
+      st.tip ? h('div', { class: 'conf-tip' }, st.tip) : null,
+      st.items.map(([x, note]) => h('div', { class: 'conf-row' + (x.id === w.id ? ' me' : '') },
+        h('button', { class: 'conf-w', type: 'button', lang: 'en', onclick: () => sayWord(x) }, x.w),
+        h('span', { class: 'conf-d' }, note || shortMeaning(x.m, 30)))))));
+}
 function wordCard(w, opts = {}) {
   const card = h('article', { class: 'card' });
   const ety = w.note ? etyBlock(w.note) : null;
@@ -1144,9 +1190,13 @@ function wordCard(w, opts = {}) {
     spk.innerHTML = ICON[slow ? 'slow' : 'play']; spk.classList.toggle('slow', slow);
     TTS.speak(speakable(w.w), { rate: slow ? 0.6 : 1, onend: () => { spk.innerHTML = ICON.play; spk.classList.remove('slow'); } });
   }, '朗读（再点一次放慢）', true);
+  const px = PLUS && PLUS.words && PLUS.words[w.id];
+  const sayIt = t => TTS.speak(t.replace(/\s*\(.*?\)/g, ''), { lang: 'it-IT' });
   card.append(h('div', { class: 'head' }, hw,
     h('div', { class: 'ipa-row' }, w.ipa ? h('span', { class: 'ipa' }, '/' + w.ipa + '/') : null, spk),
-    w.m ? h('div', { class: 'mean' }, meaningNodes(w.m)) : null));
+    w.m ? h('div', { class: 'mean' }, meaningNodes(w.m)) : null,
+    px && px.it && px.it.length ? h('div', { class: 'it-row' }, h('span', { class: 'lang-tag', 'aria-label': '意大利语' }, 'IT'),
+      px.it.map((t, i) => [i ? h('span', { class: 'it-sep' }, '·') : null, h('button', { class: 'it-w', type: 'button', lang: 'it', onclick: () => sayIt(t) }, t.replace(/\s*\((.*?)\)/, ''), /\((.*?)\)/.test(t) ? h('small', { class: 'it-g' }, ' ' + t.match(/\((.*?)\)/)[1] + '.') : null)])) : null));
   if (w.img) {
     const box = h('div', { class: 'illus' }, h('span', { class: 'note' }, '图例加载中…'));
     card.append(box);
@@ -1156,15 +1206,29 @@ function wordCard(w, opts = {}) {
     });
   }
   if (ety) card.append(ety.el);
+  const conf = confusionBlock(w);
+  if (conf) card.append(conf);
   for (const ex of (w.ex || [])) {
     card.append(h('div', { class: 'blk' }, h('span', { class: 'k' }, '例'),
       h('div', null,
         h('div', { class: 'en', lang: 'en' }, ex.en, ' ', soundBtn(() => TTS.speak(ex.en), '朗读例句', true)),
         ex.zh ? h('div', { class: 'zh' }, ex.zh) : null)));
   }
-  if (w.col && w.col.length) {
+  if (px && px.syn && px.syn.length) {
+    card.append(h('div', { class: 'blk' }, h('span', { class: 'k' }, '替'),
+      h('div', { class: 'schips' }, px.syn.map(t => h('button', { class: 'schip', type: 'button', lang: 'en', onclick: () => sayText(t) }, t)))));
+  }
+  const seen = new Set(), cols = [...(w.col || []), ...((px && px.col) || [])].filter(c => { const k = String(c[0]).toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  if (cols.length) {
     card.append(h('div', { class: 'blk' }, h('span', { class: 'k' }, '搭'),
-      h('div', { class: 'cols' }, w.col.map(c => h('span', null, h('b', { lang: 'en' }, c[0]), ' ', h('em', null, c[1]))))));
+      h('div', { class: 'cols' }, cols.map(c => h('span', null, h('b', { lang: 'en' }, c[0]), ' ', h('em', null, c[1]))))));
+  }
+  if (px && px.its) {
+    card.append(h('div', { class: 'blk' }, h('span', { class: 'k' }, '意'),
+      h('div', { class: 'cols' },
+        px.its.diff ? h('div', { class: 'it-diff' }, Object.entries(px.its.diff).map(([t, d], i) => h('div', { class: 'conf-row' + (i ? '' : ' me') }, h('b', { lang: 'it' }, t), h('span', { class: 'conf-d' }, d))))
+          : px.its.near && px.its.near.length ? h('span', { class: 'it-near' }, '近义 ', px.its.near.map((t, i) => [i ? ' · ' : '', h('b', { lang: 'it' }, t)])) : null,
+        (px.its.cols || []).map(c => h('span', null, h('b', { lang: 'it' }, c[0]), ' ', h('em', null, c[1]))))));
   }
   if (w.rel && w.rel.length) {
     card.append(h('div', { class: 'blk' }, h('span', { class: 'k' }, '记'), h('div', { class: 'cols' }, w.rel.map(r => h('span', null, r)))));
@@ -1250,7 +1314,7 @@ function optionMeanings(word, pool, n = 4, near) {
   const p = posOf(word);
   const nearIds = new Set((near || []).map(x => x.id));
   const seen = new Set([own]);
-  const cands = [...(near || []), ...pool].filter(x => x.id !== word.id && x.m && !seen.has(shortMeaning(x.m)) && seen.add(shortMeaning(x.m)));
+  const cands = [...(near || []), ...pool].filter(x => x.id !== word.id && x.m && !confusable(word, x) && !seen.has(shortMeaning(x.m)) && seen.add(shortMeaning(x.m)));
   /* related words (same themed group) first, then same part of speech */
   const tier = x => (nearIds.has(x.id) ? 0 : 2) + (posOf(x) === p ? 0 : 1);
   const picked = shuffle(cands).sort((a, b) => tier(a) - tier(b)).slice(0, n - 1);
@@ -1272,8 +1336,34 @@ function meaningChoices(word, opts, onPick) {
   });
   return list;
 }
+/* Words easily mixed up. Curated sets carry a rule of thumb and a note per word; elsewhere two words
+   count as confusable when their Chinese meanings share a term (灾难 / 小灾难). Questions never offer a
+   confusable word as a wrong option — a meaning can't tell them apart — and the cards spell out the difference. */
+const CONFUSABLE = [{"ids":["U01.001","U01.002","U01.003"],"tip":"地球的\"三圈\"：气体、水、岩石","notes":{"U01.001":"大气圈：包围地球的气体层；也指\"气氛\"","U01.002":"水圈：地球上所有的水（海洋、河湖、冰川、水汽）","U01.003":"岩石圈：坚硬的外层，即地壳加上地幔顶部"}},{"ids":["U01.009","U01.010","U01.008"],"tip":"由外到内：crust → mantle → core","notes":{"U01.009":"地壳：最外面薄薄的一层；也指面包皮、硬外壳","U01.010":"地幔：地壳和地核之间最厚的一层；也指\"披风\"","U01.008":"地核：地球最中心；也泛指\"核心\""}},{"ids":["U01.004","U01.005"],"tip":"一个是元素，一个是化合物","notes":{"U01.004":"氧气：一种气体元素，供呼吸","U01.005":"氧化物：含氧的化合物，如铁锈（iron oxide）"}},{"ids":["U01.012","U01.011"],"tip":"latitude 像梯子的横档（南北），longitude 是南北走向的长线（东西）","notes":{"U01.012":"纬度：南北位置，纬线与赤道平行","U01.011":"经度：东西位置，经线连接南北两极"}},{"ids":["U01.016","U01.015","U01.018","U01.017"],"tip":"按严重程度：mishap < disaster < calamity / catastrophic","notes":{"U01.016":"小意外、小差错，后果不严重","U01.015":"最常用，泛指造成重大损失的灾难（自然或人为）","U01.018":"较正式，强调给人或社会带来的深重不幸","U01.017":"形容词，\"灾难性的\"，后果极其严重、毁灭性的"}},{"ids":["U01.019","U01.020"],"tip":"宾语不同：endanger 多接生命安全，jeopardise 多接抽象的东西","notes":{"U01.019":"使（生命、物种、安全）处于危险中，常见 endangered species","U01.020":"危害、断送（前途、机会、计划、关系）"}},{"ids":["U01.033","U01.032","U01.035","U01.034"],"tip":"风力由小到大：breeze < gust < gale；monsoon 讲季节","notes":{"U01.033":"微风、和风，令人舒适","U01.032":"一阵突然的强风，来得快去得快","U01.035":"持续的大风（约 8 级），常伴风暴","U01.034":"季风；也指季风带来的雨季"}},{"ids":["U01.036","U01.038","U01.037"],"tip":"看地点：hurricane 大西洋，typhoon 西北太平洋，tornado 在陆地","notes":{"U01.036":"飓风：大西洋和东北太平洋上的热带气旋","U01.038":"台风：西北太平洋（东亚）上的热带气旋","U01.037":"龙卷风：陆地上漏斗状的旋风，范围小、破坏力集中"}},{"ids":["U01.045","U01.043","U01.044"],"tip":"看成分：mist 是水汽，smog 是污染加雾，fume 是有害烟气","notes":{"U01.045":"薄雾：自然的水汽，比 fog 稀薄","U01.043":"雾霾：烟尘污染与雾混合（smoke + fog）","U01.044":"（难闻、有害的）烟气，常用复数 fumes"}},{"ids":["U01.048","U01.049"],"tip":"一个是被淹，一个是急流","notes":{"U01.048":"洪水泛滥：水漫出来淹没陆地","U01.049":"湍急的水流、激流；也指\"一连串\"（a torrent of）"}},{"ids":["U01.047","U01.115"],"tip":"词性不同：drought 是一段旱灾，arid 描述常年干燥","notes":{"U01.047":"n. 一段时期不下雨造成的旱灾（事件）","U01.115":"adj. 长期干燥少雨的（气候、地区）"}},{"ids":["U01.050","U01.051"],"tip":"名词和形容词","notes":{"U01.050":"n. 地震（一次具体的事件）","U01.051":"adj. 地震的，如 seismic waves / seismic activity"}},{"ids":["U01.055","U01.104"],"tip":"看参照物：continent 是大洲，mainland 是相对岛屿而言","notes":{"U01.055":"大陆、大洲（七大洲之一）；the Continent 指欧洲大陆","U01.104":"本土、大陆：相对附近岛屿而言，如 mainland China"}},{"ids":["U01.067","U01.068","U01.070"],"tip":"北、南、两极通用","notes":{"U01.067":"北极的；也形容\"极冷的\"","U01.068":"南极的；the Antarctic 指南极地区","U01.070":"极地的（南北极都可以）；也指\"截然相反的\""}},{"ids":["U01.072","U01.073","U01.074","U01.076"],"tip":"看谁变坏、怎么变坏","notes":{"U01.072":"不及物：（健康、关系、质量）自己逐渐变坏","U01.073":"及物：使本来就不好的情况（病情、矛盾）更糟","U01.074":"及物：使（环境、土地、材料）退化、降解；也指贬低人格","U01.076":"风、水等把岩石、土壤慢慢磨掉；也指（信心、权力）被削弱"}},{"ids":["U01.080","U01.081"],"tip":"名词和形容词","notes":{"U01.080":"n. 海洋、大洋","U01.081":"adj. 海洋的、海生的，如 marine life"}},{"ids":["U01.087","U01.088"],"tip":"一个是涨落，一个是流动","notes":{"U01.087":"潮汐：海水随月球引力定时涨落；也指\"趋势\"","U01.088":"持续朝一个方向的水流、气流；也指电流"}},{"ids":["U01.089","U01.090"],"tip":"大小和用法","notes":{"U01.089":"小溪，比 stream 更小，偏文学化","U01.090":"小河、溪流；也作动词\"流动\"，还指\"一连串\""}},{"ids":["U01.107","U01.106","U01.108"],"tip":"短期 vs 长期 vs 学科","notes":{"U01.107":"天气：某时某地的短期大气状况","U01.106":"气候：一个地区多年平均的天气特征","U01.108":"气象学：研究天气的学科"}},{"ids":["U01.109","U01.111"],"tip":"mild 讲温和、轻微，moderate 讲适度、中等","notes":{"U01.109":"温和的（天气、性格）；轻微的（症状、批评）","U01.111":"适度的、中等程度的（不多不少），也作动词\"缓和\""}},{"ids":["U01.116","U01.117","U01.118"],"tip":"感情色彩：moist 中性偏好，damp 不舒服，humid 说空气","notes":{"U01.116":"湿润的（蛋糕、皮肤、土壤），多为好事","U01.117":"潮湿的（衣服、墙壁），令人不舒服","U01.118":"空气湿热的（天气、气候）"}},{"ids":["U01.092","U01.093"],"tip":"具体的浅 vs 表面的","notes":{"U01.092":"浅的（水、盘子）；也指人\"肤浅\"","U01.093":"表面的（伤口）；流于表面、不深入的"}},{"ids":["U01.094","U01.095"],"tip":"有没有起伏 vs 有没有颗粒","notes":{"U01.094":"平的、没有坡度或起伏","U01.095":"光滑的、没有颗粒；也指\"平稳顺利\""}},{"ids":["U01.085","U01.086","U01.084"],"tip":"区域、水边、能玩的沙滩","notes":{"U01.085":"海岸：陆地靠海的一带（地理区域）","U01.086":"岸：海、湖、河的水边都可以","U01.084":"海滩、河滩：沙或卵石铺成、可以游玩的平地"}},{"ids":["U02.002","U02.004","U02.003"],"tip":"冷的程度：chill < frigid；freeze 是结冰","notes":{"U02.002":"（使）变冷；寒意、凉意（程度较轻）","U02.004":"极其寒冷的（正式）；也指冷淡","U02.003":"结冰、冻结；也指（人）冻僵、僵住"}},{"ids":["U02.005","U02.006"],"tip":"看原因：tremble 多因害怕激动，shiver 多因寒冷","notes":{"U02.005":"因害怕、激动、虚弱而颤抖","U02.006":"因寒冷（或恐惧）而打寒战"}},{"ids":["U02.007","U02.008"],"tip":"一个听到，一个看到","notes":{"U02.007":"雷声：听到的声音","U02.008":"闪电：看到的光"}},{"ids":["U02.010","U02.014","U02.012","U02.011"],"tip":"雨的大小和说法","notes":{"U02.010":"倾盆大雨：短时间的强降雨","U02.014":"阵雨：下一会儿就停","U02.012":"毛毛细雨；也作动词\"撒\"","U02.011":"降雨量（统计数字），如 annual rainfall"}},{"ids":["U02.020","U02.019","U02.018"],"tip":"山、山名、山顶","notes":{"U02.020":"山（最普通的说法）","U02.019":"用在山名前，如 Mount Everest；也作动词\"登上\"","U02.018":"山峰、峰顶；也指\"顶点、高峰期\""}},{"ids":["U02.021","U02.022"],"tip":"一排山 vs 山顶的脊","notes":{"U02.021":"山脉：一系列相连的山；也指\"范围\"","U02.022":"山脊：山顶连成的狭长部分"}},{"ids":["U02.023","U02.025"],"tip":"任何斜面 vs 小山的侧面","notes":{"U02.023":"斜坡（任何倾斜面）；也作动词\"倾斜\"","U02.025":"小山的山腰、山坡"}},{"ids":["U02.032","U02.033"],"tip":"方位 vs 文化","notes":{"U02.032":"东部的、东方的（中性的方位词）","U02.033":"东方的（指亚洲文化，带旧式色彩）"}},{"ids":["U02.039","U02.040","U02.042","U02.043"],"tip":"沉下来的、河里带来的、能烧陶的、脏的","notes":{"U02.039":"沉积物：沉到水底的物质","U02.040":"淤泥：河流带来的细泥沙","U02.042":"黏土：可以烧制陶器、砖","U02.043":"泥土；也指污垢"}},{"ids":["U02.045","U02.046"],"tip":"住宅区 vs 城市边缘","notes":{"U02.045":"郊区：城市外围的住宅区，常说 the suburbs","U02.046":"市郊、城边：城市的边缘地带，总用复数"}},{"ids":["U02.047","U02.049","U02.048"],"tip":"偏僻、遥远、荒凉","notes":{"U02.047":"偏远、与世隔绝的；也指可能性\"极小\"","U02.049":"距离或时间遥远的；关系疏远的","U02.048":"荒凉无人烟的；也形容人\"孤寂凄凉\""}},{"ids":["U02.052","U02.053","U02.054"],"tip":"现象、物质、动作","notes":{"U02.052":"n. 污染（现象，不可数）","U02.053":"n. 污染物（具体的物质）","U02.054":"v. 使（水、食物）被有害物质污染"}},{"ids":["U02.056","U02.057","U02.058"],"tip":"边界、页边、外围","notes":{"U02.056":"边界、国界；边缘","U02.057":"页边空白；差额、余地（a narrow margin）","U02.058":"外围、边缘；非主流的（fringe groups）"}},{"ids":["U02.061","U02.062"],"tip":"细纹 vs 空当","notes":{"U02.061":"裂缝、裂纹（细的）；也作动词\"破裂\"","U02.062":"缺口、空隙；差距（the gap between）"}},{"ids":["U02.063","U02.064","U02.065","U02.066"],"tip":"夸奖的语气","notes":{"U02.063":"极好的、壮丽的（英式口语夸赞）","U02.064":"宏大的、豪华气派的（规模大）","U02.065":"壮丽宏伟、令人赞叹（程度最强）","U02.066":"超级棒的（很口语）"}},{"ids":["U02.069","U02.070","U02.072","U02.048"],"tip":"荒野、沙漠、贫瘠、荒凉","notes":{"U02.069":"荒野：未开发的自然地区","U02.070":"沙漠","U02.072":"贫瘠的：不长植物的（土地）","U02.048":"荒凉无人烟、令人凄凉的"}},{"ids":["U02.079","U02.081"],"tip":"日落 vs 日落之后","notes":{"U02.079":"日落：太阳落下的时刻或景象","U02.081":"黄昏：日落后天色渐暗的时候"}},{"ids":["U02.082","U02.083"],"tip":"宗教的天堂 vs 人间乐园","notes":{"U02.082":"天堂（宗教）；the heavens 指天空","U02.083":"乐园、天堂般美好的地方（多指人间）"}},{"ids":["U02.085","U02.086"],"tip":"一片背阴 vs 一个影子","notes":{"U02.085":"背阴处：挡住阳光的区域，没有具体形状","U02.086":"影子：有轮廓的投影"}},{"ids":["U02.094","U02.093","U02.092"],"tip":"天然的泉、人造的喷泉、瀑布","notes":{"U02.094":"泉：地下水自然涌出的地方","U02.093":"喷泉：人造的","U02.092":"瀑布"}},{"ids":["U02.096","U02.098","U02.102","U02.097"],"tip":"倒、滴、涌、排","notes":{"U02.096":"倒、倾泻（大量连续）","U02.098":"滴（一滴一滴）","U02.102":"喷涌（突然大量涌出）","U02.097":"排水、流走；使耗尽"}},{"ids":["U02.103","U02.105","U02.104"],"tip":"稠密 vs 集中加强","notes":{"U02.103":"稠密的（人口、森林、雾）","U02.105":"adj. 集中的、加强的，如 intensive farming","U02.104":"n. 强度、强烈程度"}},{"ids":["U02.111","U02.112"],"tip":"状态 vs 局面","notes":{"U02.111":"状态、状况；conditions 指环境条件","U02.112":"处境、形势：一系列事情构成的局面"}},{"ids":["U02.115","U02.116"],"tip":"仿造 vs 化学合成","notes":{"U02.115":"人造的（仿照自然，如人造花、人工智能）","U02.116":"化学合成的（材料，如合成纤维）"}},{"ids":["U02.117","U02.119","U02.118","U02.120"],"tip":"英式、美式和原油","notes":{"U02.117":"汽油（英式）","U02.119":"汽油（美式）","U02.118":"气体；美式口语里也指汽油","U02.120":"石油（原油）"}},{"ids":["U02.109","U02.110"],"tip":"名词和形容词","notes":{"U02.109":"n. 环境（自然环境、周围状况）","U02.110":"adj. 周围的；surroundings 才是名词\"周围环境\""}}];
+const CONF_BY = new Map();
+CONFUSABLE.forEach(set => set.ids.forEach(id => { if (!CONF_BY.has(id)) CONF_BY.set(id, []); CONF_BY.get(id).push(set); }));
+const M_TOK = new Map();
+function meaningTokens(m) {
+  if (M_TOK.has(m)) return M_TOK.get(m);
+  const out = new Set();
+  const s = cleanMeaning(m).replace(/（.*?）|\(.*?\)|\[.*?\]|［.*?］/g, '').replace(/\b(?:n|v|vt|vi|adj|adv|prep|conj|pron|num|art|int|abbr)\./g, '；');
+  for (let t of s.split(/[；;，,、。…\s]+/)) {
+    t = t.trim().replace(/^[使把被对将]/, '').replace(/的$/, '');
+    if (t.length >= 2 && /^[\u4e00-\u9fff]+$/.test(t)) out.add(t);
+  }
+  M_TOK.set(m, out);
+  return out;
+}
+function posOfM(m) { return (cleanMeaning(m).match(/^(\w+)\./) || [])[1] || ''; }
+function confusable(a, b) {
+  if (!a || !b || a.id === b.id) return false;
+  if ((CONF_BY.get(a.id) || []).some(set => set.ids.includes(b.id))) return true;
+  const ta = meaningTokens(a.m), tb = meaningTokens(b.m);
+  for (const x of ta) for (const y of tb) if (x === y || x.includes(y) || y.includes(x)) return true;
+  return false;
+}
 function optionWords(word, pool, n = 4) {
-  const cands = shuffle(pool.filter(x => x.id !== word.id && x.w.toLowerCase() !== word.w.toLowerCase()));
+  const cands = shuffle(pool.filter(x => x.id !== word.id && x.w.toLowerCase() !== word.w.toLowerCase() && !confusable(word, x)));
   return shuffle([word, ...cands.slice(0, n - 1)]);
 }
 
@@ -2673,8 +2763,9 @@ function pageSettings() {
     h('div', { class: 'set' },
       h('div', null, h('b', null, META.title || '词库'), h('div', { class: 'note' }, META.units.length + ' 个单元 · ' + META.units.reduce((a, u) => a + u.count, 0) + ' 词 · 导入于 ' + (META.imported || ''))),
       h('div', { class: 'note' }, Store.mode === 'cloud' ? '词库和进度保存在你自己账号下的私有空间，iPhone 和 Mac 打开同一个链接会自动同步；别人打开这个链接看不到。' : '当前只保存在这台设备的浏览器里。在 claude.ai 或 Claude App 登录后打开本页，可以跨设备同步。'),
+      h('div', { class: 'note' }, '可以导入：词库文件、同义替换文件、意大利语对照文件' + (PLUS && PLUS.units ? '（已导入 ' + PLUS.units.map(x => 'U' + unitNo(unitById(x) || { id: x })).join('、') + '）' : '') + '。'),
       h('div', { class: 'row2' },
-        h('button', { class: 'btn ghost', onclick: () => importFlow(true) }, '导入文件（词库 / 同义替换）'),
+        h('button', { class: 'btn ghost', onclick: () => importFlow(true) }, '导入文件'),
         h('button', { class: 'btn ghost', onclick: async () => {
           if (await confirmBox('清空学习进度？', '复习记录、阅读成绩和难词本都会被清除，词库保留。', '清空')) {
             P.data = Object.assign(P.blank(), { settings: P.data.settings }); await P.flush(); toast('进度已清空'); route();
@@ -2754,6 +2845,16 @@ function importBox(err) {
   return box;
 }
 async function doImport(data, report) {
+  if (data && data.format === 'zhenjing-plus/1' && data.words) {
+    /* extras for more units add to what is there */
+    const have = await Store.getContent('plus').catch(() => null);
+    const words = Object.assign({}, (have && have.words) || {}, data.words);
+    const units = [...new Set([...((have && have.units) || []), ...(data.units || [])])].sort();
+    report('正在保存 ' + Object.keys(words).length + ' 个词的意大利语和同义替换');
+    await Store.putContent('plus', { format: data.format, title: data.title, units, words });
+    PLUS = null;
+    return;
+  }
   if (data && data.format === 'zhenjing-syn/1' && Array.isArray(data.groups)) {
     /* synonym pages add to the ones already imported; a group with the same id is replaced */
     const have = await Store.getContent('syn').catch(() => null);
@@ -2799,7 +2900,7 @@ async function importFlow() {
   openOverlay();
   const inner = shell('', 0, '', () => closeOverlay());
   inner.querySelector('.prog').style.visibility = 'hidden';
-  inner.append(h('div', { class: 'hero' }, h('h1', null, '导入文件'), h('p', null, '词库文件会覆盖现有词库，同义替换文件会加到已有的同义替换里，学习进度都保留。')), importBox());
+  inner.append(h('div', { class: 'hero' }, h('h1', null, '导入文件'), h('p', null, '词库文件会覆盖现有词库，同义替换和意大利语文件会加到已有的内容里，学习进度都保留。')), importBox());
 }
 
 /* ============================================================ router / boot */
@@ -2870,6 +2971,7 @@ async function boot() {
   TTS.init();
   await loadMeta().catch(() => null);
   SYN = await Store.getContent('syn').catch(() => null);
+  PLUS = await Store.getContent('plus').catch(() => null);
   const nav = document.getElementById('nav');
   if (!META) { nav.hidden = true; $app.textContent = ''; $app.append(pageWelcome()); return; }
   nav.hidden = false;
